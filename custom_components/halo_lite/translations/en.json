@@ -1,0 +1,25 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Add Halo Lite",
+        "description": "Select a discovered Halo Lite device.",
+        "data": {
+          "address": "Device"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "Add Halo Lite",
+        "description": "Do you want to set up {name}?"
+      }
+    },
+    "abort": {
+      "already_configured": "This device is already configured",
+      "not_supported": "This device is not a supported Halo Lite",
+      "not_pairable": "The device is not advertising a usable access code right now. Power-cycle the Halo Lite to put it into pairing mode and try again.",
+      "no_devices_found": "No unconfigured Halo Lite devices were found",
+      "cannot_connect": "The selected device could not be found"
+    }
+  }
+}

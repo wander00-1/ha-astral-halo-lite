@@ -17,8 +17,8 @@ from bleak_retry_connector import BleakClientWithServiceCache, establish_connect
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant, callback
 
-from .const import CHAR_TX_NOTIFY
-from .protocol import HaloLightState, HaloLiteClient
+from .const import CHAR_TX_NOTIFY, MANUFACTURER_ID
+from .protocol import HaloLightState, HaloLiteClient, parse_manufacturer_data
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +53,25 @@ class HaloLiteCoordinator:
         for update_callback in list(self._listeners):
             update_callback()
 
+    @callback
+    def _async_current_access_code(self) -> bytes:
+        """Return the access code from the latest advertisement.
+
+        The code changes on power-cycle, so prefer the live advertised value
+        and fall back to the one stored at setup.
+        """
+        info = bluetooth.async_last_service_info(
+            self.hass, self.address, connectable=True
+        )
+        if info is not None:
+            raw = info.manufacturer_data.get(MANUFACTURER_ID)
+            if raw is not None:
+                adv = parse_manufacturer_data(raw)
+                if adv is not None and adv.is_pairable:
+                    self.access_code = adv.access_code  # keep the fallback fresh
+                    return adv.access_code
+        return self.access_code
+
     # -- high-level operations ---------------------------------------------
     async def async_turn_on(self) -> None:
         await self._run(lambda c: c.turn_on())
@@ -84,7 +103,7 @@ class HaloLiteCoordinator:
                 timeout=_CONNECT_TIMEOUT,
             )
             try:
-                halo = HaloLiteClient(client, self.access_code)
+                halo = HaloLiteClient(client, self._async_current_access_code())
                 await halo.authenticate()
                 if action is not None:
                     await action(halo)

@@ -57,10 +57,9 @@ class HaloAdvertisement:
 def is_valid_access_code(code: bytes | None) -> bool:
     """A usable access code is 4 printable-ASCII bytes (e.g. ``b"TT84"``).
 
-    Outside the ~10 s power-on pairing window the device advertises a
-    placeholder (``01 01 01 00``) rather than its real code, so a ``!= 0``
-    test is not enough. Requiring printable ASCII rejects both the
-    placeholder and the all-zero "not pairable" value.
+    The access-code field (advert offset 17) is all zeros outside the ~10 s
+    power-on pairing window, so a ``!= 0`` test is not enough on its own.
+    Requiring printable ASCII rejects the all-zero "not pairable" value.
     """
     return code is not None and len(code) == 4 and all(0x21 <= b <= 0x7E for b in code)
 

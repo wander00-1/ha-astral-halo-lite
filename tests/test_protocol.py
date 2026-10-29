@@ -18,43 +18,44 @@ from halo_lite.protocol import (
 SESSION = bytes.fromhex("17825ad7af1e5e6a336035dacfe0853b")
 ACCESS = b"TT84"
 
-# Real advertisement manufacturer-specific payload (company id 0x0447 stripped),
-# captured from HLITE2: serial 2813710 (0e ef 2a 00), access code 01 01 01 00.
-#   03 00 00 01 00 00 | 0e ef 2a 00 | 01 01 01 00 | 01 00 3c 00 00 00 00 00 00
+# Real advertisement manufacturer-specific payloads (company id 0x0447
+# stripped), captured from HLITE2 serial 2813710 (0e ef 2a 00). The real
+# access code lives at offset 17, NOT in the fixed 01 01 01 00 field at 10-13.
+#   steady:  ...2a 00 | 01 01 01 00 | 01 00 3c | 00 00 00 00 | 00 00   (zeros @17)
+#   pairing: ...2a 00 | 01 01 01 00 | 01 00 00 | 54 54 38 34 | 00 00   ("TT84" @17)
 ADV = bytes.fromhex("0300000100000eef2a000101010001003c000000000000")
+ADV_PAIRING = bytes.fromhex("0300000100000eef2a0001010100010000545438340000")
 
 
-def test_parse_manufacturer_data_steady_state_placeholder():
-    # 01 01 01 00 is the non-pairing placeholder, NOT a usable access code.
+def test_parse_manufacturer_data_steady_state_not_pairable():
+    # At offset 17 the code field is all zeros when not in the pairing window.
     adv = parse_manufacturer_data(ADV)
     assert adv is not None
     assert adv.serial_number == 2813710
-    assert adv.access_code == bytes.fromhex("01010100")
+    assert adv.access_code == bytes.fromhex("00000000")
     assert adv.is_pairable is False
 
 
-def test_parse_manufacturer_data_valid_code():
-    data = bytearray(ADV)
-    data[const.ADV_ACCESS_CODE_OFFSET : const.ADV_ACCESS_CODE_OFFSET + 4] = b"TT84"
-    adv = parse_manufacturer_data(bytes(data))
+def test_parse_manufacturer_data_pairing_window_real_code():
+    # The real code TT84 appears at offset 17 during the power-on window.
+    adv = parse_manufacturer_data(ADV_PAIRING)
     assert adv is not None
     assert adv.serial_number == 2813710
     assert adv.access_code == b"TT84"
     assert adv.is_pairable is True
 
 
-def test_parse_manufacturer_data_not_pairable():
-    data = bytearray(ADV)
-    data[const.ADV_ACCESS_CODE_OFFSET : const.ADV_ACCESS_CODE_OFFSET + 4] = b"\x00\x00\x00\x00"
-    adv = parse_manufacturer_data(bytes(data))
-    assert adv is not None
-    assert adv.is_pairable is False
+def test_parse_ignores_fixed_01010100_field():
+    # Bytes 10-13 are always 01 01 01 00 and must NOT be read as the code.
+    assert ADV[10:14] == bytes.fromhex("01010100")
+    assert ADV_PAIRING[10:14] == bytes.fromhex("01010100")
+    assert parse_manufacturer_data(ADV).access_code != bytes.fromhex("01010100")
 
 
 def test_is_valid_access_code():
     assert is_valid_access_code(b"TT84") is True
     assert is_valid_access_code(b"AB12") is True
-    assert is_valid_access_code(bytes.fromhex("01010100")) is False  # placeholder
+    assert is_valid_access_code(bytes.fromhex("01010100")) is False  # fixed field
     assert is_valid_access_code(b"\x00\x00\x00\x00") is False
     assert is_valid_access_code(b"TT8") is False  # wrong length
     assert is_valid_access_code(None) is False

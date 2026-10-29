@@ -171,3 +171,23 @@ def test_light_state_is_on_off():
     assert HaloLightState(mode=const.MODE_OFF).is_on is False
     assert HaloLightState(mode=const.MODE_ON).is_on is True
     assert HaloLightState(mode=None).is_on is None
+
+
+def test_output_flag_drives_is_on_in_auto():
+    # In Auto the schedule decides on/off; the output flag (payload byte 8)
+    # is what should drive is_on, overriding the mode-based fallback.
+    assert HaloLightState(mode=const.MODE_AUTO, output_on=True).is_on is True
+    assert HaloLightState(mode=const.MODE_AUTO, output_on=False).is_on is False
+    # Fallback to mode when the flag isn't known.
+    assert HaloLightState(mode=const.MODE_AUTO, output_on=None).is_on is True
+
+
+def test_notify_parses_output_flag():
+    c = HaloLiteClient(FakeClient(SESSION), ACCESS)
+    c._session_key = SESSION  # noqa: SLF001
+    # LightState: mode=Auto(1) at [0], effect=0 at [4], output-on=0 at [8].
+    pt = bytes.fromhex("012c0101000000000000000000000000000000ca")
+    c._handle_notify(None, bytearray(encrypt_characteristic(pt, SESSION)))  # noqa: SLF001
+    assert c.state.mode == const.MODE_AUTO
+    assert c.state.output_on is False
+    assert c.state.is_on is False  # Auto but currently off per the schedule

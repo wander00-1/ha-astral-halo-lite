@@ -101,31 +101,38 @@ class HaloLiteCoordinator:
         self._async_notify_listeners()
 
     # -- high-level operations ---------------------------------------------
+    # Each command reads the real state back when it can (which carries the true
+    # output-on flag, important for Auto). Only if that read-back failed do we
+    # fall back to an optimistic guess.
     async def async_turn_on(self) -> None:
-        await self._run(lambda c: c.turn_on())
-        self._set_optimistic(MODE_ON)
+        if not await self._run(lambda c: c.turn_on()):
+            self._set_optimistic(MODE_ON, output_on=True)
 
     async def async_turn_off(self) -> None:
-        await self._run(lambda c: c.turn_off())
-        self._set_optimistic(MODE_OFF)
+        if not await self._run(lambda c: c.turn_off()):
+            self._set_optimistic(MODE_OFF, output_on=False)
 
     async def async_set_auto(self) -> None:
-        await self._run(lambda c: c.set_auto())
-        self._set_optimistic(MODE_AUTO)
+        # In Auto the schedule decides on/off, so don't guess the output here.
+        if not await self._run(lambda c: c.set_auto()):
+            self._set_optimistic(MODE_AUTO, output_on=None)
 
     async def async_set_effect(self, effect: int) -> None:
-        await self._run(lambda c: c.set_effect(effect))
-        self._set_optimistic(MODE_ON, effect)
+        if not await self._run(lambda c: c.set_effect(effect)):
+            self._set_optimistic(MODE_ON, effect, output_on=True)
 
     async def async_refresh(self) -> None:
         await self._run(None)
 
     @callback
-    def _set_optimistic(self, mode: int, effect: int | None = None) -> None:
-        """Reflect the commanded state immediately (read-back may have failed)."""
+    def _set_optimistic(
+        self, mode: int, effect: int | None = None, output_on: bool | None = None
+    ) -> None:
+        """Reflect the commanded state immediately (read-back failed)."""
         self.state = HaloLightState(
             mode=mode,
             effect=effect if effect is not None else self.state.effect,
+            output_on=output_on,
             raw=self.state.raw,
         )
         self._async_notify_listeners()
@@ -133,17 +140,19 @@ class HaloLiteCoordinator:
     # -- connection plumbing -----------------------------------------------
     async def _run(
         self, action: Callable[[HaloLiteClient], Awaitable[None]] | None
-    ) -> None:
+    ) -> bool:
+        """Run a command/refresh; return True if fresh device state was read."""
         if not self.has_access_code:
             raise HaloAuthError(
                 "no pairing code captured yet - power-cycle the Halo Lite so it "
                 "advertises its access code (the ~10s window after power-on)"
             )
+        got_state = False
         async with self._lock:
             last_err: Exception | None = None
             for attempt in range(1, _MAX_ATTEMPTS + 1):
                 try:
-                    await self._attempt(action)
+                    got_state = await self._attempt(action)
                     break
                 except (
                     BleakError,
@@ -165,11 +174,15 @@ class HaloLiteCoordinator:
                 assert last_err is not None
                 raise last_err
         self._async_notify_listeners()
+        return got_state
 
     async def _attempt(
         self, action: Callable[[HaloLiteClient], Awaitable[None]] | None
-    ) -> None:
-        """One connect -> authenticate -> command -> read-state cycle."""
+    ) -> bool:
+        """One connect -> authenticate -> command -> read-state cycle.
+
+        Returns True if the light state was read back from the device.
+        """
         ble_device = bluetooth.async_ble_device_from_address(
             self.hass, self.address, connectable=True
         )
@@ -184,6 +197,7 @@ class HaloLiteCoordinator:
             self.address,
             timeout=_CONNECT_TIMEOUT,
         )
+        got_state = False
         try:
             halo = HaloLiteClient(client, self.access_code)
             await halo.authenticate()
@@ -192,6 +206,7 @@ class HaloLiteCoordinator:
                 await halo.request_light_state()
                 await asyncio.sleep(_STATE_SETTLE)
                 self.state = halo.state
+                got_state = True
             else:
                 # A command (on/off/effect). Once the write lands the action
                 # has succeeded; the device often drops the link right after,
@@ -202,6 +217,7 @@ class HaloLiteCoordinator:
                     await halo.request_light_state()
                     await asyncio.sleep(_STATE_SETTLE)
                     self.state = halo.state
+                    got_state = True
                 except (BleakError, HaloProtocolError, TimeoutError, OSError):
                     _LOGGER.debug(
                         "post-command state read-back failed (best effort)"
@@ -217,6 +233,7 @@ class HaloLiteCoordinator:
                 await client.disconnect()
             except Exception:  # noqa: BLE001 - best effort on teardown
                 pass
+        return got_state
 
 
 class HaloConnectionError(Exception):

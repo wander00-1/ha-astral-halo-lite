@@ -84,10 +84,17 @@ class HaloLightState:
 
     mode: int | None = None
     effect: int | None = None
+    # Whether the light output is actually lit right now, reported separately
+    # from mode (payload byte 8). This is what tells on-vs-off while in Auto.
+    output_on: bool | None = None
     raw: bytes = field(default=b"", repr=False)
 
     @property
     def is_on(self) -> bool | None:
+        # Prefer the real output flag so Auto reflects the schedule's current
+        # on/off; fall back to the mode when the flag isn't known.
+        if self.output_on is not None:
+            return self.output_on
         if self.mode is None:
             return None
         return self.mode != MODE_OFF
@@ -173,8 +180,12 @@ class HaloLiteClient:
         if not self._authenticated.is_set():
             self._authenticated.set()
         if cmd_type == CMD_LIGHT_STATE and len(payload) >= 5:
+            output_on = bool(payload[8]) if len(payload) > 8 else None
             self.state = HaloLightState(
-                mode=payload[0], effect=payload[4], raw=payload
+                mode=payload[0],
+                effect=payload[4],
+                output_on=output_on,
+                raw=payload,
             )
             for cb in list(self._listeners):
                 cb(self.state)

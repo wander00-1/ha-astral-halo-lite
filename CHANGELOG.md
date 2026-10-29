@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4
+
+- The light now reflects the real on/off output (reported separately from the
+  mode), so while Mode is Auto the toggle shows on when the schedule has it on
+  and off when it has it off, instead of always showing on.
+
 ## 0.1.3
 
 - Add a **Mode** select (Off / Auto / On). Auto puts the light on its internal

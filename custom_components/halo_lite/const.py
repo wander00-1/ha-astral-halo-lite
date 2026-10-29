@@ -46,6 +46,11 @@ OPCODE_ACTION = 3
 CMD_LIGHT_STATE = 300      # read -> [mode, 0,0,0, effect, ...]
 CMD_LIGHT_ACTIONS = 501    # action -> light control
 
+# Device info / diagnostics (decimal cmd types, decoded from a live capture).
+CMD_DEVICE_PROFILE = 1     # deviceType + version numbers
+CMD_DEVICE_DATE = 3        # [day, month, year-2000, dow]
+CMD_STATS_RUN_HOURS = 602  # zone1 run hours (uint32 LE)
+
 # Timer characteristics (decimal cmd types, decoded from a live capture).
 CMD_DEVICE_TIME = 2        # read -> live device clock
 CMD_TIMER_CAPS = 400       # read -> capabilities (byte 1 ~ timer count)

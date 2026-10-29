@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.6
+
+- Add diagnostic sensors: **Light run time** (lifetime run hours, zone 1) and
+  **Device date** (the device's own calendar, which the timers run on), both
+  decoded from a live capture. Read alongside the timers, no extra connection.
+
 ## 0.1.5
 
 - **Editable timers.** Each timer now has a start time, a stop time and an

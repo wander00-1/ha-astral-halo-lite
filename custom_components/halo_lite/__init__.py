@@ -21,6 +21,7 @@ from .protocol import is_valid_access_code, parse_manufacturer_data
 PLATFORMS: list[Platform] = [
     Platform.LIGHT,
     Platform.SELECT,
+    Platform.SENSOR,
     Platform.SWITCH,
     Platform.TIME,
 ]

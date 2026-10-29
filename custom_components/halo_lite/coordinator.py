@@ -25,8 +25,12 @@ from homeassistant.core import HomeAssistant, callback
 
 from dataclasses import replace
 
+from datetime import date
+
 from .const import (
     CHAR_TX_NOTIFY,
+    CMD_DEVICE_DATE,
+    CMD_STATS_RUN_HOURS,
     DEFAULT_TIMER_COUNT,
     MODE_AUTO,
     MODE_OFF,
@@ -41,6 +45,8 @@ from .protocol import (
     HaloTimer,
     build_timer_config,
     is_valid_access_code,
+    parse_device_date,
+    parse_run_hours,
     parse_timer_config,
 )
 
@@ -74,6 +80,8 @@ class HaloLiteCoordinator:
         self._persist = persist_access_code
         self.state = HaloLightState()
         self.timers: dict[int, HaloTimer] = {}
+        self.run_hours: int | None = None
+        self.device_date: date | None = None
         self._lock = asyncio.Lock()
         self._listeners: list[Callable[[], None]] = []
 
@@ -183,6 +191,24 @@ class HaloLiteCoordinator:
                 timers[timer.index] = timer
         if timers:
             self.timers = timers
+
+        # Diagnostics (best effort - don't fail the whole read over these).
+        try:
+            hours = parse_run_hours(
+                await client.read_characteristic(CMD_STATS_RUN_HOURS)
+            )
+            if hours is not None:
+                self.run_hours = hours
+        except HaloProtocolError:
+            pass
+        try:
+            ymd = parse_device_date(
+                await client.read_characteristic(CMD_DEVICE_DATE)
+            )
+            if ymd is not None:
+                self.device_date = date(*ymd)
+        except (HaloProtocolError, ValueError):
+            pass
 
     async def _op_write_timer(self, client: HaloLiteClient, timer: HaloTimer) -> None:
         await client.write_timer_config(build_timer_config(timer))

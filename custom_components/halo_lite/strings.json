@@ -16,6 +16,10 @@
     },
     "switch": {
       "timer_enabled": { "name": "Timer {number}" }
+    },
+    "sensor": {
+      "run_hours": { "name": "Light run time" },
+      "device_date": { "name": "Device date" }
     }
   },
   "config": {

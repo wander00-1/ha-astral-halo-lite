@@ -148,6 +148,26 @@ def build_timer_config(timer: HaloTimer) -> bytes:
     return bytes(p)
 
 
+def parse_run_hours(payload: bytes) -> int | None:
+    """Zone-1 light run hours from a cmd-602 StatisticsLightRunHours payload."""
+    if len(payload) < 4:
+        return None
+    return int.from_bytes(payload[0:4], "little")
+
+
+def parse_device_date(payload: bytes) -> tuple[int, int, int] | None:
+    """Return (year, month, day) from a cmd-3 DeviceDate payload.
+
+    Layout (from capture): [0]=day, [1]=month, [2]=year-2000, [3]=day-of-week.
+    """
+    if len(payload) < 3:
+        return None
+    day, month, year = payload[0], payload[1], payload[2] + 2000
+    if not (1 <= month <= 12 and 1 <= day <= 31):
+        return None
+    return year, month, day
+
+
 class HaloLiteClient:
     """Drives the authenticated session and command/notify flow over an open client."""
 
@@ -220,6 +240,10 @@ class HaloLiteClient:
             raise HaloProtocolError(f"no response for cmd {cmd_type}") from err
         finally:
             self._waiters.pop(cmd_type, None)
+
+    async def read_characteristic(self, cmd_type: int) -> bytes:
+        """Read a simple (no-parameter) characteristic and return its payload."""
+        return await self._request(OPCODE_READ, cmd_type)
 
     async def read_timer_capabilities(self) -> bytes:
         return await self._request(OPCODE_READ, CMD_TIMER_CAPS)

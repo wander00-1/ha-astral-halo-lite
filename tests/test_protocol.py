@@ -14,7 +14,9 @@ from halo_lite.protocol import (
     HaloTimer,
     build_timer_config,
     is_valid_access_code,
+    parse_device_date,
     parse_manufacturer_data,
+    parse_run_hours,
     parse_timer_config,
 )
 
@@ -205,6 +207,22 @@ def test_timer_config_round_trip():
 
 def test_parse_timer_config_too_short():
     assert parse_timer_config(b"\x01\x00\x00") is None
+
+
+def test_parse_run_hours_from_capture():
+    # cmd-602 StatisticsLightRunHours: 59 02 00 00 (LE) = 601 hours.
+    assert parse_run_hours(bytes.fromhex("59020000000000000000000000000000")) == 601
+    assert parse_run_hours(b"\x00\x00") is None
+
+
+def test_parse_device_date_from_capture():
+    # cmd-3 DeviceDate: 1e 0a 1a 05 -> day 30, month 10, year 2026.
+    assert parse_device_date(bytes.fromhex("1e0a1a05000000000000000000000000")) == (
+        2026,
+        10,
+        30,
+    )
+    assert parse_device_date(b"\x00\x00\x1a") is None  # month 0 invalid
 
 
 def test_light_state_is_on_off():

@@ -16,6 +16,7 @@ BLE, the same way the official app does it.
 - **Editable timers**: per-timer start/stop time and enabled switch (Auto follows these)
 - Select a **preset effect / colour**
 - Reads the light's current **on/off + effect** state back from the device
+- **Diagnostics**: lifetime light run hours and the device's own date
 - Local push — auto-discovered over Bluetooth, works through ESPHome Bluetooth proxies
 
 ## How it works

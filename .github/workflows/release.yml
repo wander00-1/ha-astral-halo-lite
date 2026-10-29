@@ -1,0 +1,28 @@
+name: Release
+
+# When a release is published, build the integration zip and attach it so
+# HACS (zip_release) can download it and GitHub tracks the download count.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  attach-zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build halo_lite.zip
+        run: |
+          cd custom_components/halo_lite
+          zip -r "$GITHUB_WORKSPACE/halo_lite.zip" . -x '*__pycache__*' '*.pyc'
+
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          gh release upload "${{ github.event.release.tag_name }}"
+          halo_lite.zip --clobber --repo "${{ github.repository }}"

@@ -58,13 +58,22 @@ MODE_ON = 2
 
 FRAME_LEN = 20
 
-# Default effect names (indices are device presets; refine once fully mapped).
+# Effect/colour presets for the SLX/FLX light type, as the SetZoneColour byte
+# (payload[2] of a cmd-501 action-5 frame). Verified from the official app's
+# LightPreset table (ids 0-11) and cross-checked against the BLE capture
+# (effect 4->3 == Green->Orange). Indices 7-8 ("Custom …") recall a user-stored
+# colour/pattern and may do nothing until one has been set from the app.
 EFFECT_NAMES: dict[int, str] = {
-    0: "effect_0",
-    1: "effect_1",
-    2: "effect_2",
-    3: "effect_3",
-    4: "effect_4",
-    5: "effect_5",
-    6: "effect_6",
+    0: "Blue",
+    1: "Magenta",
+    2: "Red",
+    3: "Orange",
+    4: "Green",
+    5: "Aqua",
+    6: "White",
+    7: "Custom Colour",
+    8: "Custom Pattern",
+    9: "Rainbow",
+    10: "Ocean",
+    11: "Disco",
 }

@@ -59,8 +59,10 @@ pytest tests/ -q
 
 ## Known limitations / TODO
 
-- **Effect names** are placeholders (`effect_0…`); the real preset names/palette still
-  need mapping from more captures.
+- **Effect names** cover the SLX/FLX palette (Blue, Magenta, Red, Orange, Green, Aqua,
+  White, Custom Colour, Custom Pattern, Rainbow, Ocean, Disco — colour-byte ids 0-11,
+  read from the official app). A light configured as a different type (Spa Electrics,
+  LumiPower, Single Colour) uses a different name set for the same ids.
 - **Access code** is captured from the advertisement during the power-on window and
   stored/reused. If your light is power-cycled while HA is not running or out of range,
   power-cycle it again once HA is back so the new code can be captured.

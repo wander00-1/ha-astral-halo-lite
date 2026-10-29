@@ -11,7 +11,7 @@
       },
       "bluetooth_confirm": {
         "title": "Add Halo Lite",
-        "description": "Do you want to set up {name}?"
+        "description": "Set up {name}? After adding, power-cycle the Halo Lite (off/on) so Home Assistant can capture its access code during the brief window after power-on."
       }
     },
     "abort": {

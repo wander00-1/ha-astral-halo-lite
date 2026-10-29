@@ -40,9 +40,11 @@ The AES key is the public FIPS-197 test vector — this is obfuscation, not secu
 2. Install **Astral Pool Halo Lite**, then restart Home Assistant.
 3. The device should be **auto-discovered** (Settings → Devices & Services). If not, add
    it manually via **Add Integration → Astral Pool Halo Lite**.
-
-> If setup reports the device is "not pairable", power-cycle the Halo Lite to refresh the
-> access code it advertises, then retry while it is advertising.
+4. **Pair it: power-cycle the Halo Lite (off, then on).** The light only advertises its
+   real access code for a brief window right after power-on; Home Assistant listens for
+   that and captures it automatically. Until a code is captured the light entity stays
+   *unavailable*. After a power-cycle the code rotates, and HA captures the new one the
+   same way — no re-configuration needed.
 
 ## Development / tests
 
@@ -59,8 +61,9 @@ pytest tests/ -q
 
 - **Effect names** are placeholders (`effect_0…`); the real preset names/palette still
   need mapping from more captures.
-- **Access-code source at runtime** is assumed to be the live advertisement. If a unit
-  instead keeps a code fixed at pairing, this may need a stored/override value.
+- **Access code** is captured from the advertisement during the power-on window and
+  stored/reused. If your light is power-cycled while HA is not running or out of range,
+  power-cycle it again once HA is back so the new code can be captured.
 - Full RGB (beyond preset effects) is not yet implemented.
 - State is refreshed on connect and after each command (the device drops idle links after
   ~15–20 s, so the integration connects on demand rather than holding a link).

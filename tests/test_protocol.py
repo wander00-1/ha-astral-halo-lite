@@ -11,6 +11,7 @@ from halo_lite.crypto import encrypt_characteristic
 from halo_lite.protocol import (
     HaloLiteClient,
     HaloLightState,
+    is_valid_access_code,
     parse_manufacturer_data,
 )
 
@@ -23,11 +24,22 @@ ACCESS = b"TT84"
 ADV = bytes.fromhex("0300000100000eef2a000101010001003c000000000000")
 
 
-def test_parse_manufacturer_data():
+def test_parse_manufacturer_data_steady_state_placeholder():
+    # 01 01 01 00 is the non-pairing placeholder, NOT a usable access code.
     adv = parse_manufacturer_data(ADV)
     assert adv is not None
     assert adv.serial_number == 2813710
     assert adv.access_code == bytes.fromhex("01010100")
+    assert adv.is_pairable is False
+
+
+def test_parse_manufacturer_data_valid_code():
+    data = bytearray(ADV)
+    data[const.ADV_ACCESS_CODE_OFFSET : const.ADV_ACCESS_CODE_OFFSET + 4] = b"TT84"
+    adv = parse_manufacturer_data(bytes(data))
+    assert adv is not None
+    assert adv.serial_number == 2813710
+    assert adv.access_code == b"TT84"
     assert adv.is_pairable is True
 
 
@@ -37,6 +49,15 @@ def test_parse_manufacturer_data_not_pairable():
     adv = parse_manufacturer_data(bytes(data))
     assert adv is not None
     assert adv.is_pairable is False
+
+
+def test_is_valid_access_code():
+    assert is_valid_access_code(b"TT84") is True
+    assert is_valid_access_code(b"AB12") is True
+    assert is_valid_access_code(bytes.fromhex("01010100")) is False  # placeholder
+    assert is_valid_access_code(b"\x00\x00\x00\x00") is False
+    assert is_valid_access_code(b"TT8") is False  # wrong length
+    assert is_valid_access_code(None) is False
 
 
 def test_parse_manufacturer_data_too_short():

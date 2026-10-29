@@ -63,6 +63,8 @@ class HaloLiteLight(LightEntity):
         )
 
     async def _async_initial_refresh(self) -> None:
+        if not self.coordinator.has_access_code:
+            return  # nothing to do until the access code is captured
         try:
             await self.coordinator.async_refresh()
         except Exception:  # noqa: BLE001 - device may simply be out of range at startup
@@ -74,7 +76,8 @@ class HaloLiteLight(LightEntity):
 
     @property
     def available(self) -> bool:
-        return True
+        # Until the pairing code has been captured we cannot control the light.
+        return self.coordinator.has_access_code
 
     @property
     def is_on(self) -> bool | None:

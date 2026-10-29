@@ -94,13 +94,15 @@ class HaloLiteConfigFlow(ConfigFlow, domain=DOMAIN):
     def _create_entry(self, info: BluetoothServiceInfoBleak) -> ConfigFlowResult:
         adv = _parse(info)
         assert adv is not None
-        if not adv.is_pairable:
-            return self.async_abort(reason="not_pairable")
+        # The usable access code is only advertised during the ~10s power-on
+        # window. Store it if it happens to be valid right now; otherwise the
+        # integration captures it from a later advertisement (power-cycle).
+        access_code = adv.access_code.hex() if adv.is_pairable else ""
         return self.async_create_entry(
             title=info.name or f"Halo Lite {adv.serial_number}",
             data={
                 CONF_ADDRESS: info.address,
-                CONF_ACCESS_CODE: adv.access_code.hex(),
+                CONF_ACCESS_CODE: access_code,
                 CONF_SERIAL: adv.serial_number,
             },
         )

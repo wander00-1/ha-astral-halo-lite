@@ -4,6 +4,11 @@ The device auto-disconnects after ~15-20s of idle, so rather than hold a
 persistent link this connects on demand: establish -> authenticate -> run the
 command -> read state -> disconnect, serialized behind a lock. State is cached
 between operations and pushed to entities via listeners.
+
+The access code the device accepts is only advertised during the ~10s window
+after power-on (outside that window it advertises a placeholder). So the code
+is *not* read live on every connect; instead a valid code is captured from
+advertisements whenever one appears (``async_update_access_code``) and reused.
 """
 
 from __future__ import annotations
@@ -17,8 +22,13 @@ from bleak_retry_connector import BleakClientWithServiceCache, establish_connect
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant, callback
 
-from .const import CHAR_TX_NOTIFY, MANUFACTURER_ID
-from .protocol import HaloLightState, HaloLiteClient, parse_manufacturer_data
+from .const import CHAR_TX_NOTIFY
+from .protocol import (
+    HaloAuthError,
+    HaloLightState,
+    HaloLiteClient,
+    is_valid_access_code,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,15 +38,26 @@ _CONNECT_TIMEOUT = 20.0
 
 
 class HaloLiteCoordinator:
-    """Owns the on-demand connection and the cached light state."""
+    """Owns the on-demand connection, the captured access code and the state."""
 
-    def __init__(self, hass: HomeAssistant, address: str, access_code: bytes) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        address: str,
+        access_code: bytes | None,
+        persist_access_code: Callable[[bytes], None] | None = None,
+    ) -> None:
         self.hass = hass
         self.address = address
-        self.access_code = access_code
+        self.access_code = access_code if is_valid_access_code(access_code) else None
+        self._persist = persist_access_code
         self.state = HaloLightState()
         self._lock = asyncio.Lock()
         self._listeners: list[Callable[[], None]] = []
+
+    @property
+    def has_access_code(self) -> bool:
+        return is_valid_access_code(self.access_code)
 
     @callback
     def async_add_listener(self, update_callback: Callable[[], None]) -> Callable[[], None]:
@@ -54,23 +75,15 @@ class HaloLiteCoordinator:
             update_callback()
 
     @callback
-    def _async_current_access_code(self) -> bytes:
-        """Return the access code from the latest advertisement.
-
-        The code changes on power-cycle, so prefer the live advertised value
-        and fall back to the one stored at setup.
-        """
-        info = bluetooth.async_last_service_info(
-            self.hass, self.address, connectable=True
-        )
-        if info is not None:
-            raw = info.manufacturer_data.get(MANUFACTURER_ID)
-            if raw is not None:
-                adv = parse_manufacturer_data(raw)
-                if adv is not None and adv.is_pairable:
-                    self.access_code = adv.access_code  # keep the fallback fresh
-                    return adv.access_code
-        return self.access_code
+    def async_update_access_code(self, code: bytes) -> None:
+        """Capture a freshly advertised access code (ignores the placeholder)."""
+        if not is_valid_access_code(code) or code == self.access_code:
+            return
+        _LOGGER.debug("captured new access code for %s", self.address)
+        self.access_code = code
+        if self._persist is not None:
+            self._persist(code)
+        self._async_notify_listeners()
 
     # -- high-level operations ---------------------------------------------
     async def async_turn_on(self) -> None:
@@ -89,12 +102,19 @@ class HaloLiteCoordinator:
     async def _run(
         self, action: Callable[[HaloLiteClient], Awaitable[None]] | None
     ) -> None:
+        if not self.has_access_code:
+            raise HaloAuthError(
+                "no pairing code captured yet - power-cycle the Halo Lite so it "
+                "advertises its access code (the ~10s window after power-on)"
+            )
         async with self._lock:
             ble_device = bluetooth.async_ble_device_from_address(
                 self.hass, self.address, connectable=True
             )
             if ble_device is None:
-                raise HaloConnectionError(f"{self.address} not currently seen by any adapter")
+                raise HaloConnectionError(
+                    f"{self.address} not currently seen by any adapter"
+                )
 
             client = await establish_connection(
                 BleakClientWithServiceCache,
@@ -103,7 +123,7 @@ class HaloLiteCoordinator:
                 timeout=_CONNECT_TIMEOUT,
             )
             try:
-                halo = HaloLiteClient(client, self._async_current_access_code())
+                halo = HaloLiteClient(client, self.access_code)
                 await halo.authenticate()
                 if action is not None:
                     await action(halo)

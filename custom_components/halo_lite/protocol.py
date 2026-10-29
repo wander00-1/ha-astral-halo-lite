@@ -47,7 +47,22 @@ class HaloAdvertisement:
 
     serial_number: int
     access_code: bytes
-    is_pairable: bool
+
+    @property
+    def is_pairable(self) -> bool:
+        """True only while the device advertises a real (usable) access code."""
+        return is_valid_access_code(self.access_code)
+
+
+def is_valid_access_code(code: bytes | None) -> bool:
+    """A usable access code is 4 printable-ASCII bytes (e.g. ``b"TT84"``).
+
+    Outside the ~10 s power-on pairing window the device advertises a
+    placeholder (``01 01 01 00``) rather than its real code, so a ``!= 0``
+    test is not enough. Requiring printable ASCII rejects both the
+    placeholder and the all-zero "not pairable" value.
+    """
+    return code is not None and len(code) == 4 and all(0x21 <= b <= 0x7E for b in code)
 
 
 def parse_manufacturer_data(data: bytes) -> HaloAdvertisement | None:
@@ -60,11 +75,7 @@ def parse_manufacturer_data(data: bytes) -> HaloAdvertisement | None:
     access_code = bytes(
         data[ADV_ACCESS_CODE_OFFSET : ADV_ACCESS_CODE_OFFSET + ADV_ACCESS_CODE_LEN]
     )
-    return HaloAdvertisement(
-        serial_number=serial,
-        access_code=access_code,
-        is_pairable=access_code != b"\x00\x00\x00\x00",
-    )
+    return HaloAdvertisement(serial_number=serial, access_code=access_code)
 
 
 @dataclass

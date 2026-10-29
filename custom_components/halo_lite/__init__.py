@@ -18,7 +18,7 @@ from .const import CONF_ACCESS_CODE, MANUFACTURER_ID
 from .coordinator import HaloLiteCoordinator
 from .protocol import is_valid_access_code, parse_manufacturer_data
 
-PLATFORMS: list[Platform] = [Platform.LIGHT]
+PLATFORMS: list[Platform] = [Platform.LIGHT, Platform.SELECT]
 
 type HaloConfigEntry = ConfigEntry[HaloLiteCoordinator]
 

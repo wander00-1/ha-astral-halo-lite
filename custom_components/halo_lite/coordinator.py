@@ -23,7 +23,7 @@ from bleak_retry_connector import BleakClientWithServiceCache, establish_connect
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant, callback
 
-from .const import CHAR_TX_NOTIFY, MODE_OFF, MODE_ON
+from .const import CHAR_TX_NOTIFY, MODE_AUTO, MODE_OFF, MODE_ON
 from .protocol import (
     HaloAuthError,
     HaloLightState,
@@ -108,6 +108,10 @@ class HaloLiteCoordinator:
     async def async_turn_off(self) -> None:
         await self._run(lambda c: c.turn_off())
         self._set_optimistic(MODE_OFF)
+
+    async def async_set_auto(self) -> None:
+        await self._run(lambda c: c.set_auto())
+        self._set_optimistic(MODE_AUTO)
 
     async def async_set_effect(self, effect: int) -> None:
         await self._run(lambda c: c.set_effect(effect))

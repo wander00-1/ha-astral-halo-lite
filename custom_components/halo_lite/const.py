@@ -46,8 +46,15 @@ OPCODE_ACTION = 3
 CMD_LIGHT_STATE = 300      # read -> [mode, 0,0,0, effect, ...]
 CMD_LIGHT_ACTIONS = 501    # action -> light control
 
-# LightAppActions (payload[0]) for cmd 501
+# LightAppActions (payload[0]) for cmd 501. Full enum (from the app / the
+# sibling pychlorinator library, UUIDs + on/off/effect bytes confirmed against
+# the BLE capture):
+#   0 NoAction  1 SetZoneModeToManual  2 SetZoneModeToAuto  3 TurnOffZone
+#   4 TurnOnZone  5 SetZoneColour  6 SynchroniseZoneColour
+# We use SetZoneModeToManual (1) for "on" - that is what the app sent and it
+# works. Auto (2) puts the light on its internal timer schedule.
 LIGHT_ACTION_ON = 0x01
+LIGHT_ACTION_AUTO = 0x02
 LIGHT_ACTION_OFF = 0x03
 LIGHT_ACTION_SET_EFFECT = 0x05
 

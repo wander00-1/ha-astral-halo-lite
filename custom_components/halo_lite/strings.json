@@ -1,4 +1,16 @@
 {
+  "entity": {
+    "select": {
+      "light_mode": {
+        "name": "Mode",
+        "state": {
+          "off": "Off",
+          "auto": "Auto",
+          "on": "On"
+        }
+      }
+    }
+  },
   "config": {
     "flow_title": "{name}",
     "step": {

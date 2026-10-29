@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+- Add a **Mode** select (Off / Auto / On). Auto puts the light on its internal
+  timer schedule (`SetZoneModeToAuto`); the select also reflects the current
+  mode read back from the device.
+
 ## 0.1.2
 
 - Retry a failed command sequence up to 5 times (was 3) with growing backoff,

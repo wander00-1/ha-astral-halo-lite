@@ -23,6 +23,7 @@ from .const import (
     CHAR_TX_NOTIFY,
     CMD_LIGHT_ACTIONS,
     CMD_LIGHT_STATE,
+    LIGHT_ACTION_AUTO,
     LIGHT_ACTION_OFF,
     LIGHT_ACTION_ON,
     LIGHT_ACTION_SET_EFFECT,
@@ -135,6 +136,9 @@ class HaloLiteClient:
 
     async def turn_off(self) -> None:
         await self._action(LIGHT_ACTION_OFF)
+
+    async def set_auto(self) -> None:
+        await self._action(LIGHT_ACTION_AUTO)
 
     async def set_effect(self, effect: int) -> None:
         await self._action(LIGHT_ACTION_SET_EFFECT, effect)

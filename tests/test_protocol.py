@@ -7,7 +7,7 @@ import asyncio
 import pytest
 
 from halo_lite import const
-from halo_lite.crypto import encrypt_characteristic
+from halo_lite.crypto import decrypt_characteristic, encrypt_characteristic, parse_frame
 from halo_lite.protocol import (
     HaloLiteClient,
     HaloLightState,
@@ -102,6 +102,19 @@ def test_turn_off_bytes_match_capture():
     c = _client(counter=0x14)
     asyncio.run(c.turn_off())
     assert c._client.writes[-1][1].hex() == "4f0c9292defb72d120470b798c9e337975f80b49"  # noqa: SLF001
+
+
+def test_set_auto_frame_uses_action_2():
+    # No capture of Auto exists, so assert the decoded frame rather than bytes:
+    # op=3 (action), cmd=501 (LightAppActions), payload[0]=2 (SetZoneModeToAuto).
+    c = _client(counter=0x20)
+    asyncio.run(c.set_auto())
+    enc = c._client.writes[-1][1]  # noqa: SLF001
+    op, cmd, payload, counter = parse_frame(decrypt_characteristic(enc, SESSION))
+    assert op == const.OPCODE_ACTION
+    assert cmd == const.CMD_LIGHT_ACTIONS
+    assert payload[0] == const.LIGHT_ACTION_AUTO == 0x02
+    assert counter == 0x20
 
 
 def test_set_effect_bytes_match_capture():

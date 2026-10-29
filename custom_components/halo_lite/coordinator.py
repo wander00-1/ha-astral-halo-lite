@@ -23,7 +23,7 @@ from bleak_retry_connector import BleakClientWithServiceCache, establish_connect
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant, callback
 
-from .const import CHAR_TX_NOTIFY
+from .const import CHAR_TX_NOTIFY, MODE_OFF, MODE_ON
 from .protocol import (
     HaloAuthError,
     HaloLightState,
@@ -83,10 +83,16 @@ class HaloLiteCoordinator:
 
     @callback
     def async_update_access_code(self, code: bytes) -> None:
-        """Capture a freshly advertised access code (ignores the placeholder)."""
-        if not is_valid_access_code(code) or code == self.access_code:
+        """Capture the advertised access code, but only if we don't have one.
+
+        The code is fixed per unit, so once a valid code is stored we keep it
+        rather than let a later (possibly spurious/partial) advertisement
+        overwrite a known-good value and break authentication. Use the
+        Reconfigure step to change the code deliberately.
+        """
+        if not is_valid_access_code(code) or self.has_access_code:
             return
-        _LOGGER.debug("captured new access code for %s", self.address)
+        _LOGGER.debug("captured access code for %s", self.address)
         self.access_code = code
         if self._persist is not None:
             self._persist(code)
@@ -95,15 +101,28 @@ class HaloLiteCoordinator:
     # -- high-level operations ---------------------------------------------
     async def async_turn_on(self) -> None:
         await self._run(lambda c: c.turn_on())
+        self._set_optimistic(MODE_ON)
 
     async def async_turn_off(self) -> None:
         await self._run(lambda c: c.turn_off())
+        self._set_optimistic(MODE_OFF)
 
     async def async_set_effect(self, effect: int) -> None:
         await self._run(lambda c: c.set_effect(effect))
+        self._set_optimistic(MODE_ON, effect)
 
     async def async_refresh(self) -> None:
         await self._run(None)
+
+    @callback
+    def _set_optimistic(self, mode: int, effect: int | None = None) -> None:
+        """Reflect the commanded state immediately (read-back may have failed)."""
+        self.state = HaloLightState(
+            mode=mode,
+            effect=effect if effect is not None else self.state.effect,
+            raw=self.state.raw,
+        )
+        self._async_notify_listeners()
 
     # -- connection plumbing -----------------------------------------------
     async def _run(
@@ -162,11 +181,25 @@ class HaloLiteCoordinator:
         try:
             halo = HaloLiteClient(client, self.access_code)
             await halo.authenticate()
-            if action is not None:
+            if action is None:
+                # A pure refresh: reading the state back IS the operation.
+                await halo.request_light_state()
+                await asyncio.sleep(_STATE_SETTLE)
+                self.state = halo.state
+            else:
+                # A command (on/off/effect). Once the write lands the action
+                # has succeeded; the device often drops the link right after,
+                # so read the new state back only on a best-effort basis and
+                # never fail (or retry) the command because of the read-back.
                 await action(halo)
-            await halo.request_light_state()
-            await asyncio.sleep(_STATE_SETTLE)
-            self.state = halo.state
+                try:
+                    await halo.request_light_state()
+                    await asyncio.sleep(_STATE_SETTLE)
+                    self.state = halo.state
+                except (BleakError, HaloProtocolError, TimeoutError, OSError):
+                    _LOGGER.debug(
+                        "post-command state read-back failed (best effort)"
+                    )
         finally:
             try:
                 await client.stop_notify(CHAR_TX_NOTIFY)

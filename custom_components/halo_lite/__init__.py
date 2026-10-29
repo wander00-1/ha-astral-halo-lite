@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import (
     BluetoothCallbackMatcher,
@@ -36,26 +38,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaloConfigEntry) -> bool
     coordinator = HaloLiteCoordinator(hass, address, access_code, _persist)
     entry.runtime_data = coordinator
 
-    # Capture the real access code whenever it is advertised (power-on window).
-    @callback
-    def _on_advertisement(
-        service_info: BluetoothServiceInfoBleak, change: BluetoothChange
-    ) -> None:
-        raw = service_info.manufacturer_data.get(MANUFACTURER_ID)
-        if raw is None:
-            return
-        adv = parse_manufacturer_data(raw)
-        if adv is not None and is_valid_access_code(adv.access_code):
-            coordinator.async_update_access_code(adv.access_code)
+    # The access code is fixed per unit, so we only need to catch it once (in
+    # the ~10s power-on advertising window). If we don't have it yet, listen
+    # for an advertisement that carries it, then stop listening. If we already
+    # have one, don't listen at all - nothing to capture.
+    if not coordinator.has_access_code:
+        cancel: list[Callable[[], None]] = []
 
-    entry.async_on_unload(
-        bluetooth.async_register_callback(
-            hass,
-            _on_advertisement,
-            BluetoothCallbackMatcher(address=address),
-            bluetooth.BluetoothScanningMode.ACTIVE,
+        @callback
+        def _stop_listening() -> None:
+            while cancel:
+                cancel.pop()()
+
+        @callback
+        def _on_advertisement(
+            service_info: BluetoothServiceInfoBleak, change: BluetoothChange
+        ) -> None:
+            raw = service_info.manufacturer_data.get(MANUFACTURER_ID)
+            if raw is None:
+                return
+            adv = parse_manufacturer_data(raw)
+            if adv is not None and is_valid_access_code(adv.access_code):
+                coordinator.async_update_access_code(adv.access_code)
+                # Captured once; the code never changes, so stop listening.
+                _stop_listening()
+
+        cancel.append(
+            bluetooth.async_register_callback(
+                hass,
+                _on_advertisement,
+                BluetoothCallbackMatcher(address=address),
+                bluetooth.BluetoothScanningMode.ACTIVE,
+            )
         )
-    )
+        entry.async_on_unload(_stop_listening)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

@@ -75,8 +75,7 @@ pytest tests/ -q
 
 Built on prior work by the Halo/Viron community: [`pychlorinator`](https://github.com/pbutterworth/pychlorinator)
 and [`pychlorinator-cloud`](https://github.com/robmarkoski/pychlorinator-cloud) for the
-sibling chlorinator protocol, NVISO's Flutter TLS bypass research, and
-[Blutter](https://github.com/worawit/blutter) for Dart/Flutter decompilation.
+sibling chlorinator protocol.
 
 ## License
 

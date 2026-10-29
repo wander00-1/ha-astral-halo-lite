@@ -11,15 +11,28 @@
       },
       "bluetooth_confirm": {
         "title": "Add Halo Lite",
-        "description": "Set up {name}? After adding, power-cycle the Halo Lite (off/on) so Home Assistant can capture its access code during the brief window after power-on."
+        "description": "Set up {name}? If you know the 4-character access code, enter it below. Otherwise leave it blank and power-cycle the Halo Lite (off/on) after adding so Home Assistant can capture it during the brief window after power-on.",
+        "data": {
+          "access_code": "Access code (optional)"
+        }
+      },
+      "reconfigure": {
+        "title": "Halo Lite access code",
+        "description": "Enter the 4-character access code the Halo Lite accepts (for example TT84).",
+        "data": {
+          "access_code": "Access code"
+        }
       }
+    },
+    "error": {
+      "invalid_access_code": "The access code must be exactly 4 printable characters."
     },
     "abort": {
       "already_configured": "This device is already configured",
       "not_supported": "This device is not a supported Halo Lite",
-      "not_pairable": "The device is not advertising a usable access code right now. Power-cycle the Halo Lite to put it into pairing mode and try again.",
       "no_devices_found": "No unconfigured Halo Lite devices were found",
-      "cannot_connect": "The selected device could not be found"
+      "cannot_connect": "The selected device could not be found",
+      "reconfigure_successful": "The access code was updated."
     }
   }
 }

@@ -19,7 +19,7 @@ from .const import (
     DOMAIN,
     MANUFACTURER_ID,
 )
-from .protocol import parse_manufacturer_data
+from .protocol import is_valid_access_code, parse_manufacturer_data
 
 
 def _parse(discovery_info: BluetoothServiceInfoBleak):
@@ -28,6 +28,16 @@ def _parse(discovery_info: BluetoothServiceInfoBleak):
     if raw is None:
         return None
     return parse_manufacturer_data(raw)
+
+
+def _code_to_hex(code: str) -> str | None:
+    """Validate a user-entered 4-char access code; return its hex, or None."""
+    code = code.strip()
+    try:
+        raw = code.encode("ascii")
+    except UnicodeEncodeError:
+        return None
+    return raw.hex() if is_valid_access_code(raw) else None
 
 
 class HaloLiteConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -53,14 +63,22 @@ class HaloLiteConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_bluetooth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Confirm a discovered device."""
+        """Confirm a discovered device (optionally entering the access code)."""
         assert self._discovery is not None
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self._create_entry(self._discovery)
-        self._set_confirm_only()
+            code = user_input.get(CONF_ACCESS_CODE, "")
+            if code and _code_to_hex(code) is None:
+                errors["base"] = "invalid_access_code"
+            else:
+                return self._create_entry(self._discovery, code)
         return self.async_show_form(
             step_id="bluetooth_confirm",
+            data_schema=vol.Schema(
+                {vol.Optional(CONF_ACCESS_CODE, default=""): str}
+            ),
             description_placeholders={"name": self._discovery.name},
+            errors=errors,
         )
 
     async def async_step_user(
@@ -73,7 +91,8 @@ class HaloLiteConfigFlow(ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
             for info in async_discovered_service_info(self.hass):
                 if info.address == address:
-                    return self._create_entry(info)
+                    self._discovery = info
+                    return await self.async_step_bluetooth_confirm()
             return self.async_abort(reason="cannot_connect")
 
         devices: dict[str, str] = {}
@@ -91,13 +110,49 @@ class HaloLiteConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({vol.Required(CONF_ADDRESS): vol.In(devices)}),
         )
 
-    def _create_entry(self, info: BluetoothServiceInfoBleak) -> ConfigFlowResult:
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Let the user enter/update the 4-character access code."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            code_hex = _code_to_hex(user_input[CONF_ACCESS_CODE])
+            if code_hex is None:
+                errors["base"] = "invalid_access_code"
+            else:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data={**entry.data, CONF_ACCESS_CODE: code_hex},
+                )
+
+        current = entry.data.get(CONF_ACCESS_CODE) or ""
+        suggested = ""
+        if current:
+            try:
+                suggested = bytes.fromhex(current).decode("ascii")
+            except (ValueError, UnicodeDecodeError):
+                suggested = ""
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {vol.Required(CONF_ACCESS_CODE, default=suggested): str}
+            ),
+            errors=errors,
+        )
+
+    def _create_entry(
+        self, info: BluetoothServiceInfoBleak, code: str = ""
+    ) -> ConfigFlowResult:
         adv = _parse(info)
         assert adv is not None
-        # The usable access code is only advertised during the ~10s power-on
-        # window. Store it if it happens to be valid right now; otherwise the
-        # integration captures it from a later advertisement (power-cycle).
-        access_code = adv.access_code.hex() if adv.is_pairable else ""
+        # Prefer a code the user typed; else a valid advertised code (only
+        # present during the ~10s power-on window); else empty and we capture
+        # it later from an advertisement.
+        access_code = _code_to_hex(code) if code else None
+        if access_code is None:
+            access_code = adv.access_code.hex() if adv.is_pairable else ""
         return self.async_create_entry(
             title=info.name or f"Halo Lite {adv.serial_number}",
             data={

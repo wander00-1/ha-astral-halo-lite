@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2
+
+- Retry a failed command sequence up to 5 times (was 3) with growing backoff,
+  giving a brief Bluetooth dropout - or the light's single connection slot
+  being momentarily held - time to clear.
+- Always release the BLE link after a command, even if teardown errors, so a
+  lingering/half-open connection can't block the next authentication.
+
 ## 0.1.1
 
 - Don't fail a command when the device drops the link right after it: once the

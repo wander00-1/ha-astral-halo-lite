@@ -39,8 +39,10 @@ _STATE_SETTLE = 1.5
 _CONNECT_TIMEOUT = 20.0
 # The device/BLE link is flaky (the official app sees this too): a connect,
 # the auth handshake, or a command write can fail transiently. Retry the whole
-# sequence a few times before giving up.
-_MAX_ATTEMPTS = 3
+# sequence several times with growing backoff before giving up, so a brief
+# dropout - or the light's single connection slot being momentarily held - has
+# time to clear.
+_MAX_ATTEMPTS = 5
 _RETRY_BACKOFF = 1.0
 
 
@@ -201,11 +203,16 @@ class HaloLiteCoordinator:
                         "post-command state read-back failed (best effort)"
                     )
         finally:
+            # Always release the link: this light allows only one connection,
+            # so a lingering/half-open link blocks the next authentication.
             try:
                 await client.stop_notify(CHAR_TX_NOTIFY)
             except Exception:  # noqa: BLE001 - best effort on teardown
                 pass
-            await client.disconnect()
+            try:
+                await client.disconnect()
+            except Exception:  # noqa: BLE001 - best effort on teardown
+                pass
 
 
 class HaloConnectionError(Exception):

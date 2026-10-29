@@ -13,6 +13,7 @@ BLE, the same way the official app does it.
 
 - Turn the light **on / off**
 - **Mode** select: Off / Auto / On (Auto runs the light on its internal timer schedule)
+- **Editable timers**: per-timer start/stop time and enabled switch (Auto follows these)
 - Select a **preset effect / colour**
 - Reads the light's current **on/off + effect** state back from the device
 - Local push — auto-discovered over Bluetooth, works through ESPHome Bluetooth proxies

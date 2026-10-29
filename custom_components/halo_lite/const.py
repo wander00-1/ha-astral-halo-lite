@@ -46,6 +46,20 @@ OPCODE_ACTION = 3
 CMD_LIGHT_STATE = 300      # read -> [mode, 0,0,0, effect, ...]
 CMD_LIGHT_ACTIONS = 501    # action -> light control
 
+# Timer characteristics (decimal cmd types, decoded from a live capture).
+CMD_DEVICE_TIME = 2        # read -> live device clock
+CMD_TIMER_CAPS = 400       # read -> capabilities (byte 1 ~ timer count)
+CMD_TIMER_SETUP = 401
+CMD_TIMER_STATE = 402
+CMD_TIMER_CONFIG = 403     # read (select by type/index/season) / write (op 3)
+
+# TimerConfiguration (cmd 403) payload layout:
+#   [0]type [1]index [2]season [3]enabledMask [4]writeMask
+#   [7]startHour [8]startMin [10]stopHour [11]stopMin
+TIMER_TYPE_CLOCK = 1       # time-of-day timer (the default type)
+TIMER_WRITE_MASK = 0x0F    # byte 4 on an op-3 write = "apply start/stop fields"
+DEFAULT_TIMER_COUNT = 2    # confirmed from capabilities on the reference unit
+
 # LightAppActions (payload[0]) for cmd 501. Full enum (from the app / the
 # sibling pychlorinator library, UUIDs + on/off/effect bytes confirmed against
 # the BLE capture):

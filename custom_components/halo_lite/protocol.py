@@ -23,6 +23,8 @@ from .const import (
     CHAR_TX_NOTIFY,
     CMD_LIGHT_ACTIONS,
     CMD_LIGHT_STATE,
+    CMD_TIMER_CAPS,
+    CMD_TIMER_CONFIG,
     LIGHT_ACTION_AUTO,
     LIGHT_ACTION_OFF,
     LIGHT_ACTION_ON,
@@ -30,6 +32,7 @@ from .const import (
     MODE_OFF,
     OPCODE_ACTION,
     OPCODE_READ,
+    TIMER_WRITE_MASK,
 )
 from .crypto import (
     build_frame,
@@ -100,6 +103,51 @@ class HaloLightState:
         return self.mode != MODE_OFF
 
 
+@dataclass
+class HaloTimer:
+    """One light timer (a daily on/off schedule the device runs in Auto)."""
+
+    index: int
+    enabled: bool
+    start_hour: int
+    start_min: int
+    stop_hour: int
+    stop_min: int
+    timer_type: int = 1
+    season: int = 0
+
+
+def parse_timer_config(payload: bytes) -> HaloTimer | None:
+    """Parse a cmd-403 TimerConfiguration response payload."""
+    if len(payload) < 12:
+        return None
+    return HaloTimer(
+        timer_type=payload[0],
+        index=payload[1],
+        season=payload[2],
+        enabled=bool(payload[3]),
+        start_hour=payload[7],
+        start_min=payload[8],
+        stop_hour=payload[10],
+        stop_min=payload[11],
+    )
+
+
+def build_timer_config(timer: HaloTimer) -> bytes:
+    """Build the cmd-403 payload for an op-3 write (sets start/stop + enabled)."""
+    p = bytearray(12)
+    p[0] = timer.timer_type & 0xFF
+    p[1] = timer.index & 0xFF
+    p[2] = timer.season & 0xFF
+    p[3] = 1 if timer.enabled else 0
+    p[4] = TIMER_WRITE_MASK
+    p[7] = timer.start_hour & 0xFF
+    p[8] = timer.start_min & 0xFF
+    p[10] = timer.stop_hour & 0xFF
+    p[11] = timer.stop_min & 0xFF
+    return bytes(p)
+
+
 class HaloLiteClient:
     """Drives the authenticated session and command/notify flow over an open client."""
 
@@ -111,6 +159,8 @@ class HaloLiteClient:
         self._authenticated = asyncio.Event()
         self.state = HaloLightState()
         self._listeners: list[Callable[[HaloLightState], None]] = []
+        # Pending reads awaiting their response notify, keyed by cmd type.
+        self._waiters: dict[int, asyncio.Future[bytes]] = {}
 
     # -- lifecycle ----------------------------------------------------------
     async def authenticate(self, timeout: float = 10.0) -> None:
@@ -153,6 +203,36 @@ class HaloLiteClient:
     async def request_light_state(self) -> None:
         await self._send(OPCODE_READ, CMD_LIGHT_STATE)
 
+    # -- timers -------------------------------------------------------------
+    async def _request(
+        self, opcode: int, cmd_type: int, payload: bytes = b"", timeout: float = 6.0
+    ) -> bytes:
+        """Send a read and wait for the matching response notify's payload."""
+        if self._session_key is None:
+            raise HaloProtocolError("not authenticated")
+        loop = asyncio.get_running_loop()
+        fut: asyncio.Future[bytes] = loop.create_future()
+        self._waiters[cmd_type] = fut
+        try:
+            await self._send(opcode, cmd_type, payload)
+            return await asyncio.wait_for(fut, timeout)
+        except TimeoutError as err:
+            raise HaloProtocolError(f"no response for cmd {cmd_type}") from err
+        finally:
+            self._waiters.pop(cmd_type, None)
+
+    async def read_timer_capabilities(self) -> bytes:
+        return await self._request(OPCODE_READ, CMD_TIMER_CAPS)
+
+    async def read_timer_config(
+        self, timer_type: int, index: int, season: int
+    ) -> bytes:
+        req = bytes([timer_type & 0xFF, index & 0xFF, season & 0xFF])
+        return await self._request(OPCODE_READ, CMD_TIMER_CONFIG, req)
+
+    async def write_timer_config(self, payload: bytes) -> None:
+        await self._send(OPCODE_ACTION, CMD_TIMER_CONFIG, payload)
+
     async def _action(self, action: int, param: int = 0) -> None:
         await self._send(
             OPCODE_ACTION, CMD_LIGHT_ACTIONS, bytes([action, 0x00, param & 0xFF])
@@ -179,6 +259,10 @@ class HaloLiteClient:
         # First notify after the auth write means the device accepted us.
         if not self._authenticated.is_set():
             self._authenticated.set()
+        # Hand the payload to any read awaiting this cmd type (timers, etc).
+        waiter = self._waiters.get(cmd_type)
+        if waiter is not None and not waiter.done():
+            waiter.set_result(payload)
         if cmd_type == CMD_LIGHT_STATE and len(payload) >= 5:
             output_on = bool(payload[8]) if len(payload) > 8 else None
             self.state = HaloLightState(

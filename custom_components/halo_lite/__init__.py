@@ -18,7 +18,12 @@ from .const import CONF_ACCESS_CODE, MANUFACTURER_ID
 from .coordinator import HaloLiteCoordinator
 from .protocol import is_valid_access_code, parse_manufacturer_data
 
-PLATFORMS: list[Platform] = [Platform.LIGHT, Platform.SELECT]
+PLATFORMS: list[Platform] = [
+    Platform.LIGHT,
+    Platform.SELECT,
+    Platform.SWITCH,
+    Platform.TIME,
+]
 
 type HaloConfigEntry = ConfigEntry[HaloLiteCoordinator]
 
@@ -74,6 +79,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaloConfigEntry) -> bool
         entry.async_on_unload(_stop_listening)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Read the timer schedule once in the background so the timer entities
+    # populate without blocking setup.
+    if coordinator.has_access_code:
+
+        async def _initial_timer_read() -> None:
+            try:
+                await coordinator.async_read_timers()
+            except Exception:  # noqa: BLE001 - device may be out of range
+                pass
+
+        entry.async_create_background_task(
+            hass, _initial_timer_read(), "halo_lite_timer_init"
+        )
+
     return True
 
 

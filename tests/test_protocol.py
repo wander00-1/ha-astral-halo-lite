@@ -11,8 +11,11 @@ from halo_lite.crypto import decrypt_characteristic, encrypt_characteristic, par
 from halo_lite.protocol import (
     HaloLiteClient,
     HaloLightState,
+    HaloTimer,
+    build_timer_config,
     is_valid_access_code,
     parse_manufacturer_data,
+    parse_timer_config,
 )
 
 SESSION = bytes.fromhex("17825ad7af1e5e6a336035dacfe0853b")
@@ -165,6 +168,43 @@ def test_send_without_session_raises():
     c = HaloLiteClient(FakeClient(SESSION), ACCESS)
     with pytest.raises(Exception):
         asyncio.run(c.turn_on())
+
+
+def test_parse_timer_config_from_capture():
+    # Real cmd-403 response for timer idx0: enabled, start 18:00, stop 21:00.
+    payload = bytes.fromhex("01000001000000120000150000000000")
+    t = parse_timer_config(payload)
+    assert t is not None
+    assert t.index == 0 and t.timer_type == 1 and t.season == 0
+    assert t.enabled is True
+    assert (t.start_hour, t.start_min) == (18, 0)
+    assert (t.stop_hour, t.stop_min) == (21, 0)
+
+
+def test_build_timer_config_matches_capture_write():
+    # The captured edit: timer 0 enabled, start 18:05, stop 21:05 (op-3 write).
+    captured = bytes.fromhex("010000010f0000120500150500000000")
+    t = HaloTimer(
+        index=0, enabled=True, start_hour=18, start_min=5, stop_hour=21, stop_min=5
+    )
+    built = build_timer_config(t)
+    assert built == captured[: len(built)]
+    assert built[4] == 0x0F  # write field-mask
+
+
+def test_timer_config_round_trip():
+    t = HaloTimer(
+        index=1, enabled=False, start_hour=6, start_min=30, stop_hour=9, stop_min=45
+    )
+    back = parse_timer_config(build_timer_config(t))
+    assert back is not None
+    assert (back.index, back.enabled) == (1, False)
+    assert (back.start_hour, back.start_min) == (6, 30)
+    assert (back.stop_hour, back.stop_min) == (9, 45)
+
+
+def test_parse_timer_config_too_short():
+    assert parse_timer_config(b"\x01\x00\x00") is None
 
 
 def test_light_state_is_on_off():

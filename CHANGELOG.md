@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.5
+
+- **Editable timers.** Each timer now has a start time, a stop time and an
+  enabled switch; changes are written back to the device. Decoded from a live
+  capture of the official app (cmd 403 TimerConfiguration), start/stop in local
+  device time. Auto mode runs these timers.
+
 ## 0.1.4
 
 - The light now reflects the real on/off output (reported separately from the

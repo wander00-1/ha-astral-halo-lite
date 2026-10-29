@@ -9,6 +9,13 @@
           "on": "On"
         }
       }
+    },
+    "time": {
+      "timer_start": { "name": "Timer {number} start" },
+      "timer_stop": { "name": "Timer {number} stop" }
+    },
+    "switch": {
+      "timer_enabled": { "name": "Timer {number}" }
     }
   },
   "config": {

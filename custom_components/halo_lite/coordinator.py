@@ -23,13 +23,25 @@ from bleak_retry_connector import BleakClientWithServiceCache, establish_connect
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant, callback
 
-from .const import CHAR_TX_NOTIFY, MODE_AUTO, MODE_OFF, MODE_ON
+from dataclasses import replace
+
+from .const import (
+    CHAR_TX_NOTIFY,
+    DEFAULT_TIMER_COUNT,
+    MODE_AUTO,
+    MODE_OFF,
+    MODE_ON,
+    TIMER_TYPE_CLOCK,
+)
 from .protocol import (
     HaloAuthError,
     HaloLightState,
     HaloLiteClient,
     HaloProtocolError,
+    HaloTimer,
+    build_timer_config,
     is_valid_access_code,
+    parse_timer_config,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,6 +73,7 @@ class HaloLiteCoordinator:
         self.access_code = access_code if is_valid_access_code(access_code) else None
         self._persist = persist_access_code
         self.state = HaloLightState()
+        self.timers: dict[int, HaloTimer] = {}
         self._lock = asyncio.Lock()
         self._listeners: list[Callable[[], None]] = []
 
@@ -124,6 +137,62 @@ class HaloLiteCoordinator:
     async def async_refresh(self) -> None:
         await self._run(None)
 
+    # -- timers -------------------------------------------------------------
+    async def async_read_timers(self) -> None:
+        """Read every timer's configuration from the device."""
+        await self._run(self._op_read_timers, readback=False)
+
+    async def async_set_timer(
+        self,
+        index: int,
+        *,
+        enabled: bool | None = None,
+        start: tuple[int, int] | None = None,
+        stop: tuple[int, int] | None = None,
+    ) -> None:
+        """Change one timer and write it back to the device."""
+        cur = self.timers.get(index)
+        if cur is None:
+            raise HaloProtocolError(f"timer {index} not loaded yet")
+        changes: dict = {}
+        if enabled is not None:
+            changes["enabled"] = enabled
+        if start is not None:
+            changes["start_hour"], changes["start_min"] = start
+        if stop is not None:
+            changes["stop_hour"], changes["stop_min"] = stop
+        new = replace(cur, **changes)
+        await self._run(
+            lambda c: self._op_write_timer(c, new), readback=False
+        )
+
+    async def _op_read_timers(self, client: HaloLiteClient) -> None:
+        try:
+            caps = await client.read_timer_capabilities()
+            count = caps[1] if len(caps) > 1 and 1 <= caps[1] <= 8 else DEFAULT_TIMER_COUNT
+        except HaloProtocolError:
+            count = DEFAULT_TIMER_COUNT
+        timers: dict[int, HaloTimer] = {}
+        for i in range(count):
+            try:
+                payload = await client.read_timer_config(TIMER_TYPE_CLOCK, i, 0)
+            except HaloProtocolError:
+                continue
+            timer = parse_timer_config(payload)
+            if timer is not None:
+                timers[timer.index] = timer
+        if timers:
+            self.timers = timers
+
+    async def _op_write_timer(self, client: HaloLiteClient, timer: HaloTimer) -> None:
+        await client.write_timer_config(build_timer_config(timer))
+        # Read the timer back so the stored value reflects what the device kept.
+        payload = await client.read_timer_config(
+            timer.timer_type, timer.index, timer.season
+        )
+        confirmed = parse_timer_config(payload)
+        self.timers[timer.index] = confirmed if confirmed is not None else timer
+
     @callback
     def _set_optimistic(
         self, mode: int, effect: int | None = None, output_on: bool | None = None
@@ -139,7 +208,10 @@ class HaloLiteCoordinator:
 
     # -- connection plumbing -----------------------------------------------
     async def _run(
-        self, action: Callable[[HaloLiteClient], Awaitable[None]] | None
+        self,
+        action: Callable[[HaloLiteClient], Awaitable[None]] | None,
+        *,
+        readback: bool = True,
     ) -> bool:
         """Run a command/refresh; return True if fresh device state was read."""
         if not self.has_access_code:
@@ -152,7 +224,7 @@ class HaloLiteCoordinator:
             last_err: Exception | None = None
             for attempt in range(1, _MAX_ATTEMPTS + 1):
                 try:
-                    got_state = await self._attempt(action)
+                    got_state = await self._attempt(action, readback)
                     break
                 except (
                     BleakError,
@@ -177,11 +249,15 @@ class HaloLiteCoordinator:
         return got_state
 
     async def _attempt(
-        self, action: Callable[[HaloLiteClient], Awaitable[None]] | None
+        self,
+        action: Callable[[HaloLiteClient], Awaitable[None]] | None,
+        readback: bool = True,
     ) -> bool:
         """One connect -> authenticate -> command -> read-state cycle.
 
-        Returns True if the light state was read back from the device.
+        Returns True if the light state was read back from the device. When
+        ``readback`` is False (e.g. timer ops that do their own reads), the
+        light-state read is skipped.
         """
         ble_device = bluetooth.async_ble_device_from_address(
             self.hass, self.address, connectable=True
@@ -201,7 +277,10 @@ class HaloLiteCoordinator:
         try:
             halo = HaloLiteClient(client, self.access_code)
             await halo.authenticate()
-            if action is None:
+            if action is not None and not readback:
+                # Self-contained op (e.g. timers): it does its own reads.
+                await action(halo)
+            elif action is None:
                 # A pure refresh: reading the state back IS the operation.
                 await halo.request_light_state()
                 await asyncio.sleep(_STATE_SETTLE)

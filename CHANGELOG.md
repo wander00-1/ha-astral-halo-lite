@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.10
+
+- **Wait for the device's single connection slot to clear before reconnecting.**
+  These devices allow only one BLE connection and need a moment after a link is
+  torn down before accepting a new one; `disconnect()` returning doesn't mean
+  the slot is free. A minimum gap since the last disconnect is now enforced, so
+  a quick second operation (e.g. two `dump` calls back to back) no longer fails
+  to connect until the device recovers.
+
 ## 0.1.9
 
 - **Detect the device type and only create light entities for a light.** The

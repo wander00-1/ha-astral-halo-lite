@@ -62,6 +62,13 @@ _CONNECT_TIMEOUT = 20.0
 # time to clear.
 _MAX_ATTEMPTS = 5
 _RETRY_BACKOFF = 1.0
+# These devices allow a single BLE connection and need a moment after a link is
+# torn down before the radio will accept a new one. `client.disconnect()`
+# returning does not mean the slot is free yet, so enforce a minimum gap since
+# our last disconnect before opening the next connection. Without this, a quick
+# second operation (e.g. two dumps back to back) hits a slot that has not
+# cleared and fails to connect/authenticate until the device recovers.
+_SLOT_COOLDOWN = 5.0
 
 
 class HaloLiteCoordinator:
@@ -84,6 +91,9 @@ class HaloLiteCoordinator:
         self.device_date: date | None = None
         self._lock = asyncio.Lock()
         self._listeners: list[Callable[[], None]] = []
+        # Monotonic time of the last BLE disconnect, so the next connect can
+        # wait out _SLOT_COOLDOWN and let the device's single slot clear.
+        self._last_disconnect: float = 0.0
         # Platforms set up for this entry (empty for a non-light device); set
         # by __init__.py after device-type detection, read back on unload.
         self.platforms: list = []
@@ -328,6 +338,12 @@ class HaloLiteCoordinator:
                 f"{self.address} not currently seen by any adapter"
             )
 
+        # Let the device's single connection slot clear from our previous link
+        # before opening a new one.
+        gap = _SLOT_COOLDOWN - (asyncio.get_running_loop().time() - self._last_disconnect)
+        if gap > 0:
+            await asyncio.sleep(gap)
+
         client = await establish_connection(
             BleakClientWithServiceCache,
             ble_device,
@@ -373,6 +389,7 @@ class HaloLiteCoordinator:
                 await client.disconnect()
             except Exception:  # noqa: BLE001 - best effort on teardown
                 pass
+            self._last_disconnect = asyncio.get_running_loop().time()
         return got_state
 
 

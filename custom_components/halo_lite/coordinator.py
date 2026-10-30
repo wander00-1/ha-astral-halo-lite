@@ -84,6 +84,9 @@ class HaloLiteCoordinator:
         self.device_date: date | None = None
         self._lock = asyncio.Lock()
         self._listeners: list[Callable[[], None]] = []
+        # Platforms set up for this entry (empty for a non-light device); set
+        # by __init__.py after device-type detection, read back on unload.
+        self.platforms: list = []
 
     @property
     def has_access_code(self) -> bool:

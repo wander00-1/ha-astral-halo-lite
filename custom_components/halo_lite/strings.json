@@ -41,9 +41,10 @@
       },
       "reconfigure": {
         "title": "Halo Lite access code",
-        "description": "Enter the 4-character access code the Halo Lite accepts (for example TT84).",
+        "description": "Enter the 4-character access code the Halo Lite accepts (for example TT84). Turn off polling if this device shares its single Bluetooth connection with another controller and the periodic poll is interfering.",
         "data": {
-          "access_code": "Access code"
+          "access_code": "Access code",
+          "polling": "Poll the device every 2 minutes"
         }
       }
     },

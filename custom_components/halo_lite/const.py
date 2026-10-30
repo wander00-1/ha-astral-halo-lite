@@ -7,6 +7,12 @@ DOMAIN = "halo_lite"
 # Config entry keys
 CONF_ACCESS_CODE = "access_code"
 CONF_SERIAL = "serial"
+CONF_POLLING = "polling"
+
+# Poll the device on this interval so Auto/timer-driven state changes show up
+# in HA. Can be disabled per entry (CONF_POLLING) when the periodic connection
+# contends with another BLE client for the device's single connection slot.
+DEFAULT_POLLING = True
 
 # --- BLE identity -----------------------------------------------------------
 # Manufacturer-specific data company id (Fabtronics Australia Pty Ltd).

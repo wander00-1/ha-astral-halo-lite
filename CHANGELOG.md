@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.9
+
+- **Detect the device type and only create light entities for a light.** The
+  same BLE protocol is spoken by other Astral/Fabtronics devices (e.g. a Viron
+  pump). Those are now set up with **no entities** - only the connection and
+  the read-only `dump` service, so they can be mapped without pretending to be
+  a light. A device is treated as a light when its name contains `HLITE`.
+- **Reconfigure can now turn off the 2-minute poll.** Some devices (e.g. a
+  pump sharing its single Bluetooth connection with a chlorinator) can't spare
+  the periodic connection; disabling it stops the poll from contending for the
+  device's one connection slot. The poll defaults to on and only runs for a
+  light.
+
 ## 0.1.8
 
 - Add a **read-only `halo_lite.dump` diagnostic service**. It connects,

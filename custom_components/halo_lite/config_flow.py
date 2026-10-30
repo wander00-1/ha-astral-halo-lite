@@ -15,7 +15,9 @@ from homeassistant.const import CONF_ADDRESS
 
 from .const import (
     CONF_ACCESS_CODE,
+    CONF_POLLING,
     CONF_SERIAL,
+    DEFAULT_POLLING,
     DOMAIN,
     MANUFACTURER_ID,
 )
@@ -123,7 +125,11 @@ class HaloLiteConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_update_reload_and_abort(
                     entry,
-                    data={**entry.data, CONF_ACCESS_CODE: code_hex},
+                    data={
+                        **entry.data,
+                        CONF_ACCESS_CODE: code_hex,
+                        CONF_POLLING: user_input.get(CONF_POLLING, DEFAULT_POLLING),
+                    },
                 )
 
         current = entry.data.get(CONF_ACCESS_CODE) or ""
@@ -137,7 +143,13 @@ class HaloLiteConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=vol.Schema(
-                {vol.Required(CONF_ACCESS_CODE, default=suggested): str}
+                {
+                    vol.Required(CONF_ACCESS_CODE, default=suggested): str,
+                    vol.Required(
+                        CONF_POLLING,
+                        default=entry.data.get(CONF_POLLING, DEFAULT_POLLING),
+                    ): bool,
+                }
             ),
             errors=errors,
         )

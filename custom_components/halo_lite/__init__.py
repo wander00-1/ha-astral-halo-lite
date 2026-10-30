@@ -22,7 +22,14 @@ from homeassistant.core import (
 )
 from homeassistant.helpers.event import async_track_time_interval
 
-from .const import CONF_ACCESS_CODE, DEFAULT_PROBE_CMDS, DOMAIN, MANUFACTURER_ID
+from .const import (
+    CONF_ACCESS_CODE,
+    CONF_POLLING,
+    DEFAULT_POLLING,
+    DEFAULT_PROBE_CMDS,
+    DOMAIN,
+    MANUFACTURER_ID,
+)
 from .coordinator import HaloLiteCoordinator
 from .protocol import is_valid_access_code, parse_manufacturer_data
 
@@ -57,6 +64,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaloConfigEntry) -> bool
 
     coordinator = HaloLiteCoordinator(hass, address, access_code, _persist)
     entry.runtime_data = coordinator
+
+    # This integration's entities model a Halo Lite *light*. The same BLE
+    # protocol is also spoken by other Astral/Fabtronics devices (e.g. a Viron
+    # pump), which this integration can connect to and probe with the `dump`
+    # service, but which have none of the light's entities. Detect the device
+    # type from its advertised name and, for anything that isn't a light, set
+    # up no platforms (yet) - keep only the connection + the dump service.
+    service_info = bluetooth.async_last_service_info(hass, address)
+    name = (service_info.name if service_info else None) or entry.title or ""
+    is_light = "HLITE" in name.upper()
+    platforms = PLATFORMS if is_light else []
+    coordinator.platforms = platforms
 
     # The access code is fixed per unit, so we only need to catch it once (in
     # the ~10s power-on advertising window). If we don't have it yet, listen
@@ -93,11 +112,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaloConfigEntry) -> bool
         )
         entry.async_on_unload(_stop_listening)
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await hass.config_entries.async_forward_entry_setups(entry, platforms)
 
     # Read the timer schedule once in the background so the timer entities
     # populate without blocking setup.
-    if coordinator.has_access_code:
+    if is_light and coordinator.has_access_code:
 
         async def _initial_timer_read() -> None:
             try:
@@ -111,17 +130,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaloConfigEntry) -> bool
 
     # Poll the device so Auto/timer-driven on/off changes are reflected even
     # when HA didn't issue the command itself. No-op until a code is captured.
-    async def _async_poll(now) -> None:
-        if not coordinator.has_access_code:
-            return
-        try:
-            await coordinator.async_refresh()
-        except Exception:  # noqa: BLE001 - device may simply be out of range
-            pass
+    # Only lights have pollable state; can also be turned off per entry
+    # (Reconfigure) for a device whose single connection slot is being shared
+    # with another BLE client.
+    if is_light and entry.data.get(CONF_POLLING, DEFAULT_POLLING):
 
-    entry.async_on_unload(
-        async_track_time_interval(hass, _async_poll, SCAN_INTERVAL)
-    )
+        async def _async_poll(now) -> None:
+            if not coordinator.has_access_code:
+                return
+            try:
+                await coordinator.async_refresh()
+            except Exception:  # noqa: BLE001 - device may simply be out of range
+                pass
+
+        entry.async_on_unload(
+            async_track_time_interval(hass, _async_poll, SCAN_INTERVAL)
+        )
 
     _async_register_dump_service(hass)
 
@@ -164,4 +188,7 @@ def _async_register_dump_service(hass: HomeAssistant) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: HaloConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    platforms = getattr(entry.runtime_data, "platforms", PLATFORMS)
+    if not platforms:
+        return True
+    return await hass.config_entries.async_unload_platforms(entry, platforms)

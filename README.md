@@ -77,7 +77,9 @@ with a Bluetooth `address` to target one device.
 - Full RGB (beyond preset effects) is not yet implemented.
 - State is refreshed on startup, after each command, and on a 2-minute poll (the device
   drops idle links after ~15–20 s, so the integration connects on demand rather than
-  holding a link). The poll is what lets Auto/timer-driven on/off show up in HA.
+  holding a link). The poll is what lets Auto/timer-driven on/off show up in HA. It can
+  be turned off per device via **Reconfigure** for a device that shares its single
+  Bluetooth connection with another controller and can't spare the periodic connection.
 
 ## Credits
 

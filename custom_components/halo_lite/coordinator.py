@@ -210,6 +210,38 @@ class HaloLiteCoordinator:
         except (HaloProtocolError, ValueError):
             pass
 
+    # -- diagnostics / probe ------------------------------------------------
+    async def async_probe(
+        self, cmd_types, timeout: float = 3.0
+    ) -> dict[int, str]:
+        """Read-only sweep: connect, auth, read each cmd type, return hex.
+
+        A missing/unsupported cmd simply times out and is recorded as such.
+        Nothing is ever written to the device.
+        """
+        results: dict[int, str] = {}
+        await self._run(
+            lambda c: self._op_probe(c, cmd_types, results, timeout),
+            readback=False,
+        )
+        return results
+
+    async def _op_probe(
+        self, client: HaloLiteClient, cmd_types, results: dict[int, str], timeout: float
+    ) -> None:
+        for cmd in cmd_types:
+            try:
+                payload = await client.read_characteristic(cmd, timeout=timeout)
+                hexstr = payload.hex()
+                results[cmd] = hexstr
+                _LOGGER.warning("halo probe %s: cmd %s -> %s", self.address, cmd, hexstr)
+            except HaloProtocolError:
+                results[cmd] = "(no response)"
+                _LOGGER.warning("halo probe %s: cmd %s -> no response", self.address, cmd)
+            except Exception as err:  # noqa: BLE001 - keep sweeping past any error
+                results[cmd] = f"(error: {err})"
+                _LOGGER.warning("halo probe %s: cmd %s -> error %s", self.address, cmd, err)
+
     async def _op_write_timer(self, client: HaloLiteClient, timer: HaloTimer) -> None:
         await client.write_timer_config(build_timer_config(timer))
         # Read the timer back so the stored value reflects what the device kept.

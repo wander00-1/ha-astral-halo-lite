@@ -84,6 +84,23 @@ MODE_ON = 2
 
 FRAME_LEN = 20
 
+# Read-only diagnostic sweep. These are the known Gen2 characteristic cmd types
+# (decimal) across the Fabtronics family (device info, chlorinator, equipment,
+# light, timers, stats, heating, solar). The `halo_lite.dump` service reads each
+# one (no parameters) and logs/returns whatever the device answers, so a device
+# that isn't a light (e.g. a Viron pump) can be mapped by what it responds to.
+# Action channels (500/501) are write-only and deliberately excluded.
+DEFAULT_PROBE_CMDS: tuple[int, ...] = (
+    1, 2, 3, 6, 9, 19, 20, 23,          # device info / status
+    100, 101, 102, 104, 105, 106, 107,  # chlorinator
+    201, 202, 203, 206,                 # equipment (where a pump lives)
+    300, 301,                           # light
+    400, 401, 402,                      # timers (403 needs params)
+    600, 601, 602, 603,                 # statistics
+    1100, 1101, 1102,                   # heating
+    1200, 1201, 1202,                   # solar
+)
+
 # Effect/colour presets for the SLX/FLX light type, as the SetZoneColour byte
 # (payload[2] of a cmd-501 action-5 frame). Verified from the official app's
 # LightPreset table (ids 0-11) and cross-checked against the BLE capture

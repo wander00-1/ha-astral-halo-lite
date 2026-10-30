@@ -13,10 +13,16 @@ from homeassistant.components.bluetooth import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, Platform
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+    callback,
+)
 from homeassistant.helpers.event import async_track_time_interval
 
-from .const import CONF_ACCESS_CODE, MANUFACTURER_ID
+from .const import CONF_ACCESS_CODE, DEFAULT_PROBE_CMDS, DOMAIN, MANUFACTURER_ID
 from .coordinator import HaloLiteCoordinator
 from .protocol import is_valid_access_code, parse_manufacturer_data
 
@@ -117,7 +123,43 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaloConfigEntry) -> bool
         async_track_time_interval(hass, _async_poll, SCAN_INTERVAL)
     )
 
+    _async_register_dump_service(hass)
+
     return True
+
+
+@callback
+def _async_register_dump_service(hass: HomeAssistant) -> None:
+    """Register the read-only diagnostic sweep service (once per domain).
+
+    ``halo_lite.dump`` connects to each Halo device, authenticates, reads a
+    sweep of Gen2 cmd types and returns/logs the decrypted responses. It never
+    writes to the device. Useful for mapping a non-light device (e.g. a Viron
+    pump) by what characteristics it answers.
+    """
+    if hass.services.has_service(DOMAIN, "dump"):
+        return
+
+    async def _handle_dump(call: ServiceCall) -> ServiceResponse:
+        address = call.data.get("address")
+        cmds = call.data.get("cmds") or list(DEFAULT_PROBE_CMDS)
+        out: dict[str, dict[str, str]] = {}
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            coordinator = getattr(entry, "runtime_data", None)
+            if coordinator is None:
+                continue
+            if address and coordinator.address.lower() != str(address).lower():
+                continue
+            try:
+                res = await coordinator.async_probe(cmds)
+                out[coordinator.address] = {str(k): v for k, v in res.items()}
+            except Exception as err:  # noqa: BLE001 - report, don't raise
+                out[coordinator.address] = {"error": str(err)}
+        return {"results": out}
+
+    hass.services.async_register(
+        DOMAIN, "dump", _handle_dump, supports_response=SupportsResponse.ONLY
+    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: HaloConfigEntry) -> bool:

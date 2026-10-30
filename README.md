@@ -60,6 +60,11 @@ pip install -r requirements_test.txt
 pytest tests/ -q
 ```
 
+There is also a read-only diagnostic service, `halo_lite.dump`, which connects,
+authenticates and reads a sweep of Gen2 characteristics, returning and logging the
+decrypted responses (it never writes). Call it from Developer Tools → Actions, optionally
+with a Bluetooth `address` to target one device.
+
 ## Known limitations / TODO
 
 - **Effect names** cover the SLX/FLX palette (Blue, Magenta, Red, Orange, Green, Aqua,

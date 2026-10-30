@@ -241,9 +241,9 @@ class HaloLiteClient:
         finally:
             self._waiters.pop(cmd_type, None)
 
-    async def read_characteristic(self, cmd_type: int) -> bytes:
+    async def read_characteristic(self, cmd_type: int, timeout: float = 6.0) -> bytes:
         """Read a simple (no-parameter) characteristic and return its payload."""
-        return await self._request(OPCODE_READ, cmd_type)
+        return await self._request(OPCODE_READ, cmd_type, timeout=timeout)
 
     async def read_timer_capabilities(self) -> bytes:
         return await self._request(OPCODE_READ, CMD_TIMER_CAPS)

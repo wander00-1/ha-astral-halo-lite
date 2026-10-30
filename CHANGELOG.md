@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.8
+
+- Add a **read-only `halo_lite.dump` diagnostic service**. It connects,
+  authenticates and reads a sweep of Gen2 characteristics, then returns and
+  logs the decrypted responses. It never writes to the device. Useful for
+  inspecting what a device actually exposes (including a non-light Gen2 device
+  that speaks the same protocol).
+
 ## 0.1.7
 
 - Poll the device every 2 minutes so the light reflects **Auto/timer-driven

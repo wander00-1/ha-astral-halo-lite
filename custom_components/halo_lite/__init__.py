@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import timedelta
 
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import (
@@ -13,6 +14,7 @@ from homeassistant.components.bluetooth import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS, Platform
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.event import async_track_time_interval
 
 from .const import CONF_ACCESS_CODE, MANUFACTURER_ID
 from .coordinator import HaloLiteCoordinator
@@ -27,6 +29,12 @@ PLATFORMS: list[Platform] = [
 ]
 
 type HaloConfigEntry = ConfigEntry[HaloLiteCoordinator]
+
+# The light's Auto mode runs it on its internal timer schedule, so state can
+# change without HA commanding it. Poll the device periodically so the entity
+# reflects those schedule-driven on/off changes instead of showing a stale
+# value until the next manual command.
+SCAN_INTERVAL = timedelta(minutes=2)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HaloConfigEntry) -> bool:
@@ -94,6 +102,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaloConfigEntry) -> bool
         entry.async_create_background_task(
             hass, _initial_timer_read(), "halo_lite_timer_init"
         )
+
+    # Poll the device so Auto/timer-driven on/off changes are reflected even
+    # when HA didn't issue the command itself. No-op until a code is captured.
+    async def _async_poll(now) -> None:
+        if not coordinator.has_access_code:
+            return
+        try:
+            await coordinator.async_refresh()
+        except Exception:  # noqa: BLE001 - device may simply be out of range
+            pass
+
+    entry.async_on_unload(
+        async_track_time_interval(hass, _async_poll, SCAN_INTERVAL)
+    )
 
     return True
 

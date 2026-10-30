@@ -70,8 +70,9 @@ pytest tests/ -q
   stored/reused. If your light is power-cycled while HA is not running or out of range,
   power-cycle it again once HA is back so the new code can be captured.
 - Full RGB (beyond preset effects) is not yet implemented.
-- State is refreshed on connect and after each command (the device drops idle links after
-  ~15–20 s, so the integration connects on demand rather than holding a link).
+- State is refreshed on startup, after each command, and on a 2-minute poll (the device
+  drops idle links after ~15–20 s, so the integration connects on demand rather than
+  holding a link). The poll is what lets Auto/timer-driven on/off show up in HA.
 
 ## Credits
 

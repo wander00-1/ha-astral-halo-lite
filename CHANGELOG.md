@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7
+
+- Poll the device every 2 minutes so the light reflects **Auto/timer-driven
+  on/off changes** it wasn't told to make. Previously state was only read on
+  startup and after a command, so a light switched on by its own schedule kept
+  showing **off** in Home Assistant until the next manual command.
+
 ## 0.1.6
 
 - Add diagnostic sensors: **Light run time** (lifetime run hours, zone 1) and

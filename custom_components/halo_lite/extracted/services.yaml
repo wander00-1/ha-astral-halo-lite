@@ -1,0 +1,23 @@
+dump:
+  name: Dump characteristics (diagnostic)
+  description: >-
+    Read-only sweep of Gen2 characteristics on each Halo device: connects,
+    authenticates, reads a list of cmd types and returns/logs the decrypted
+    responses. Never writes to the device. Use it to map a non-light device
+    (e.g. a Viron pump) by what it answers, and to diff before/after changing
+    something on the device itself.
+  fields:
+    address:
+      name: Bluetooth address
+      description: Limit to one device (e.g. D5:4D:6F:09:A8:D4). Omit for all.
+      required: false
+      example: "D5:4D:6F:09:A8:D4"
+      selector:
+        text:
+    cmds:
+      name: Command types
+      description: Decimal cmd types to read. Omit to use the default sweep.
+      required: false
+      example: "[1, 201, 202, 206, 300]"
+      selector:
+        object:

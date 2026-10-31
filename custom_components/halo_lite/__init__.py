@@ -69,12 +69,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaloConfigEntry) -> bool
     # protocol is also spoken by other Astral/Fabtronics devices (e.g. a Viron
     # pump), which this integration can connect to and probe with the `dump`
     # service, but which have none of the light's entities. Detect the device
-    # type from its advertised name and, for anything that isn't a light, set
-    # up no platforms (yet) - keep only the connection + the dump service.
+    # type from its advertised name. A light gets the full set of platforms; a
+    # non-light (e.g. a pump) gets only a passive "advertising" binary sensor -
+    # the pump advertises only while powered on, so that tracks on/off without
+    # ever connecting or contending for the device's single connection slot.
     service_info = bluetooth.async_last_service_info(hass, address)
     name = (service_info.name if service_info else None) or entry.title or ""
     is_light = "HLITE" in name.upper()
-    platforms = PLATFORMS if is_light else []
+    platforms = PLATFORMS if is_light else [Platform.BINARY_SENSOR]
     coordinator.platforms = platforms
 
     # The access code is fixed per unit, so we only need to catch it once (in

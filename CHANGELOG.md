@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.13
+
+- **Pump/non-light "Status" binary sensor.** A non-light Astral device (e.g. a
+  Viron pump) now gets a passive **Status** sensor that reads **On** while the
+  device is advertising over BLE and **Off** when it stops. These devices only
+  advertise while powered on, so this tracks the pump's on/off without ever
+  connecting to it: it listens for advertisements only, so it never competes
+  for the device's single Bluetooth connection slot. Off is reported after
+  ~2.5 minutes without an advertisement.
+
 ## 0.1.12
 
 - **Diagnostic logging** of the per-connection session key and computed auth

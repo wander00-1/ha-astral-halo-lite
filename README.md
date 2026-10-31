@@ -65,6 +65,14 @@ authenticates and reads a sweep of Gen2 characteristics, returning and logging t
 decrypted responses (it never writes). Call it from Developer Tools → Actions, optionally
 with a Bluetooth `address` to target one device.
 
+A non-light Astral device (for example a Viron pump, which speaks the same BLE protocol)
+is set up with a single passive **Status** binary sensor instead of the light entities. It
+reads **On** while the device is advertising over Bluetooth and **Off** when it stops.
+These devices only advertise while powered on, so this tracks the device's on/off without
+ever connecting to it. It listens for advertisements only and never competes for the
+device's single connection slot. Off is reported after about 2.5 minutes without an
+advertisement.
+
 ## Known limitations / TODO
 
 - **Effect names** cover the SLX/FLX palette (Blue, Magenta, Red, Orange, Green, Aqua,

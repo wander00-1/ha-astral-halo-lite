@@ -20,6 +20,9 @@
     "sensor": {
       "run_hours": { "name": "Light run time" },
       "device_date": { "name": "Device date" }
+    },
+    "binary_sensor": {
+      "status": { "name": "Status" }
     }
   },
   "config": {

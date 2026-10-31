@@ -1,0 +1,19 @@
+{
+  "domain": "halo_lite",
+  "name": "Astral Pool Halo Lite",
+  "bluetooth": [
+    {
+      "manufacturer_id": 1095,
+      "service_uuid": "45000001-98b7-4e29-a03f-160174643002"
+    }
+  ],
+  "codeowners": ["@wander00-1"],
+  "config_flow": true,
+  "dependencies": ["bluetooth_adapters"],
+  "documentation": "https://github.com/wander00-1/ha-astral-halo-lite",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/wander00-1/ha-astral-halo-lite/issues",
+  "requirements": ["bleak-retry-connector>=3.5.0"],
+  "version": "0.1.12"
+}

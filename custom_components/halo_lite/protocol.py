@@ -191,6 +191,15 @@ class HaloLiteClient:
             raise HaloProtocolError("unexpected session key length")
         await self._client.start_notify(CHAR_TX_NOTIFY, self._handle_notify)
         auth = compute_auth(self._session_key, self._access_code)
+        # Temporary diagnostic: log the per-connection session key and the
+        # computed auth so repeated connections can be compared (e.g. a device
+        # that only issues a usable session key once per power cycle).
+        _LOGGER.warning(
+            "halo auth %s: session_key=%s auth=%s",
+            getattr(self._client, "address", "?"),
+            self._session_key.hex(),
+            auth.hex(),
+        )
         await self._client.write_gatt_char(CHAR_MASTER_AUTH, auth, response=True)
         try:
             await asyncio.wait_for(self._authenticated.wait(), timeout)
@@ -198,6 +207,9 @@ class HaloLiteClient:
             raise HaloAuthError(
                 "device did not acknowledge authentication (check access code)"
             ) from err
+        _LOGGER.warning(
+            "halo auth %s: acknowledged", getattr(self._client, "address", "?")
+        )
 
     @property
     def is_authenticated(self) -> bool:

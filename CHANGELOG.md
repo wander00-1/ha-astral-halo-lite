@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.12
+
+- **Diagnostic logging** of the per-connection session key and computed auth
+  value (and an "acknowledged" line on success), to investigate a device that
+  accepts authentication once per power cycle and then rejects re-auth. Lets
+  repeated connections be compared to see whether the session key is reused.
+
 ## 0.1.11
 
 - **Force-close a stale/zombie link before each connect.** On a device that

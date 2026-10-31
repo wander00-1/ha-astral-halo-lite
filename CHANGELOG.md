@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.14
+
+- Give the non-light **Status** sensor a water-pump icon (shown filled when on
+  and crossed-out when off), via a local `icons.json`. No functional change.
+
 ## 0.1.13
 
 - **Pump/non-light "Status" binary sensor.** A non-light Astral device (e.g. a

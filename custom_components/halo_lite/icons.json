@@ -1,0 +1,12 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "status": {
+        "default": "mdi:water-pump",
+        "state": {
+          "off": "mdi:water-pump-off"
+        }
+      }
+    }
+  }
+}

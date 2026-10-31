@@ -18,7 +18,11 @@ from collections.abc import Awaitable, Callable
 import logging
 
 from bleak.exc import BleakError
-from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
+from bleak_retry_connector import (
+    BleakClientWithServiceCache,
+    close_stale_connections_by_address,
+    establish_connection,
+)
 
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant, callback
@@ -343,6 +347,16 @@ class HaloLiteCoordinator:
         gap = _SLOT_COOLDOWN - (asyncio.get_running_loop().time() - self._last_disconnect)
         if gap > 0:
             await asyncio.sleep(gap)
+
+        # Force any lingering/zombie link to this device (held by the local
+        # adapter or an ESPHome Bluetooth proxy) to be torn down before we
+        # reconnect. These devices allow one connection, and a half-open link
+        # left after a previous session otherwise keeps the slot busy until the
+        # device is power-cycled, so each connect after the first one fails.
+        try:
+            await close_stale_connections_by_address(self.address)
+        except Exception:  # noqa: BLE001 - best effort, never block the connect
+            pass
 
         client = await establish_connection(
             BleakClientWithServiceCache,

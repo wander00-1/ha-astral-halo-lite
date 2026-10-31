@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.11
+
+- **Force-close a stale/zombie link before each connect.** On a device that
+  allows a single connection, a half-open link left over from a previous
+  session (held by the local adapter or an ESPHome Bluetooth proxy) kept the
+  slot busy, so every connect after the first failed until the device was
+  power-cycled. We now tear down any lingering connection to the device
+  (`close_stale_connections_by_address`) before reconnecting.
+
 ## 0.1.10
 
 - **Wait for the device's single connection slot to clear before reconnecting.**

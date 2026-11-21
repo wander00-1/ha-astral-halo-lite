@@ -9,9 +9,9 @@ dump:
   fields:
     address:
       name: Bluetooth address
-      description: Limit to one device (e.g. D5:4D:6F:09:A8:D4). Omit for all.
+      description: Limit to one device (e.g. AA:BB:CC:DD:EE:FF). Omit for all.
       required: false
-      example: "D5:4D:6F:09:A8:D4"
+      example: "AA:BB:CC:DD:EE:FF"
       selector:
         text:
     cmds:

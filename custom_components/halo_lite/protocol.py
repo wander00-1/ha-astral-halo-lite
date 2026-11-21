@@ -59,7 +59,7 @@ class HaloAdvertisement:
 
 
 def is_valid_access_code(code: bytes | None) -> bool:
-    """A usable access code is 4 printable-ASCII bytes (e.g. ``b"TT84"``).
+    """A usable access code is 4 printable-ASCII bytes (e.g. ``b"XY34"``).
 
     The access-code field (advert offset 17) is all zeros outside the ~10 s
     power-on pairing window, so a ``!= 0`` test is not enough on its own.

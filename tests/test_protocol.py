@@ -20,33 +20,34 @@ from halo_lite.protocol import (
     parse_timer_config,
 )
 
-SESSION = bytes.fromhex("17825ad7af1e5e6a336035dacfe0853b")
-ACCESS = b"TT84"
+SESSION = bytes.fromhex("a1b2c3d4e5f60718293a4b5c6d7e8f90")
+ACCESS = b"XY34"
 
-# Real advertisement manufacturer-specific payloads (company id 0x0447
-# stripped), captured from HLITE2 serial 2813710 (0e ef 2a 00). The real
+# Advertisement manufacturer-specific payloads (company id 0x0447
+# stripped), in the layout of a real HLITE2 capture but with a dummy serial
+# 1234567 (87 d6 12 00) and dummy access code. The real
 # access code lives at offset 17, NOT in the fixed 01 01 01 00 field at 10-13.
 #   steady:  ...2a 00 | 01 01 01 00 | 01 00 3c | 00 00 00 00 | 00 00   (zeros @17)
-#   pairing: ...2a 00 | 01 01 01 00 | 01 00 00 | 54 54 38 34 | 00 00   ("TT84" @17)
-ADV = bytes.fromhex("0300000100000eef2a000101010001003c000000000000")
-ADV_PAIRING = bytes.fromhex("0300000100000eef2a0001010100010000545438340000")
+#   pairing: ...2a 00 | 01 01 01 00 | 01 00 00 | 58 59 33 34 | 00 00   ("XY34" @17)
+ADV = bytes.fromhex("03000001000087d612000101010001003c000000000000")
+ADV_PAIRING = bytes.fromhex("03000001000087d6120001010100010000585933340000")
 
 
 def test_parse_manufacturer_data_steady_state_not_pairable():
     # At offset 17 the code field is all zeros when not in the pairing window.
     adv = parse_manufacturer_data(ADV)
     assert adv is not None
-    assert adv.serial_number == 2813710
+    assert adv.serial_number == 1234567
     assert adv.access_code == bytes.fromhex("00000000")
     assert adv.is_pairable is False
 
 
 def test_parse_manufacturer_data_pairing_window_real_code():
-    # The real code TT84 appears at offset 17 during the power-on window.
+    # The access code (dummy XY34) appears at offset 17 during the power-on window.
     adv = parse_manufacturer_data(ADV_PAIRING)
     assert adv is not None
-    assert adv.serial_number == 2813710
-    assert adv.access_code == b"TT84"
+    assert adv.serial_number == 1234567
+    assert adv.access_code == b"XY34"
     assert adv.is_pairable is True
 
 
@@ -58,11 +59,11 @@ def test_parse_ignores_fixed_01010100_field():
 
 
 def test_is_valid_access_code():
-    assert is_valid_access_code(b"TT84") is True
+    assert is_valid_access_code(b"XY34") is True
     assert is_valid_access_code(b"AB12") is True
     assert is_valid_access_code(bytes.fromhex("01010100")) is False  # fixed field
     assert is_valid_access_code(b"\x00\x00\x00\x00") is False
-    assert is_valid_access_code(b"TT8") is False  # wrong length
+    assert is_valid_access_code(b"XY3") is False  # wrong length
     assert is_valid_access_code(None) is False
 
 
@@ -100,13 +101,13 @@ def test_turn_on_bytes_match_capture():
     asyncio.run(c.turn_on())
     uuid, data = c._client.writes[-1]  # noqa: SLF001
     assert uuid == const.CHAR_RX_WRITE
-    assert data.hex() == "38e718c96a917d32cca444bab54d0a39d0757653"
+    assert data.hex() == "f12a998bd69c964b6cadd6ce37d0fe8d9e0e8804"
 
 
 def test_turn_off_bytes_match_capture():
     c = _client(counter=0x14)
     asyncio.run(c.turn_off())
-    assert c._client.writes[-1][1].hex() == "4f0c9292defb72d120470b798c9e337975f80b49"  # noqa: SLF001
+    assert c._client.writes[-1][1].hex() == "15c97ba95c26760d3d73886d906296cfabdec64c"  # noqa: SLF001
 
 
 def test_set_auto_frame_uses_action_2():
@@ -125,13 +126,13 @@ def test_set_auto_frame_uses_action_2():
 def test_set_effect_bytes_match_capture():
     c = _client(counter=0x12)
     asyncio.run(c.set_effect(3))
-    assert c._client.writes[-1][1].hex() == "7c7b61360763ebba4553f17735871159b43a2499"  # noqa: SLF001
+    assert c._client.writes[-1][1].hex() == "849b86eee3958751cdf4f0f6776ff5233436520c"  # noqa: SLF001
 
 
 def test_request_state_bytes_match_capture():
     c = _client(counter=0x08)
     asyncio.run(c.request_light_state())
-    assert c._client.writes[-1][1].hex() == "d71e8840684e2ed5bee04aba640173909e69eaa6"  # noqa: SLF001
+    assert c._client.writes[-1][1].hex() == "867c9e0fb17509d71c03c976e45c5ca09664727c"  # noqa: SLF001
 
 
 def test_counter_increments():

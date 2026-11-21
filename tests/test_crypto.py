@@ -1,9 +1,13 @@
-"""Crypto/framing tests validated against real btsnoop-captured frames.
+"""Crypto/framing tests.
 
-Ground truth from a live Halo Lite 2 session (serial 2813710):
-  session key = 17825ad7af1e5e6a336035dacfe0853b   (read from char ...001)
-  access code = "TT84" (0x54543834)                (from the advertisement)
-  auth value  = 6457cdfe8dfcfb4796d5df663d53ce9f   (written to char ...002)
+The implementation was validated byte-for-byte against a real btsnoop
+capture. The vectors below are derived from that capture, with the
+device identifiers replaced by dummy values and every frame re-encrypted
+under the dummy session key. They are not from a real device:
+  session key = a1b2c3d4e5f60718293a4b5c6d7e8f90   (dummy; read from char ...001)
+  access code = "XY34" (0x58593334)                (dummy; from the advertisement)
+  auth value  = 53d03c479fa36818cd2fab80987f83c9   (derived; written to char ...002)
+  serial      = 1234567                            (dummy)
 """
 
 from __future__ import annotations
@@ -19,23 +23,23 @@ from halo_lite.crypto import (
     parse_frame,
 )
 
-SESSION = bytes.fromhex("17825ad7af1e5e6a336035dacfe0853b")
-ACCESS = b"TT84"
-AUTH = bytes.fromhex("6457cdfe8dfcfb4796d5df663d53ce9f")
+SESSION = bytes.fromhex("a1b2c3d4e5f60718293a4b5c6d7e8f90")
+ACCESS = b"XY34"
+AUTH = bytes.fromhex("53d03c479fa36818cd2fab80987f83c9")
 
-# (name, encrypted-on-wire, decrypted-plaintext) captured frames.
+# (name, encrypted-on-wire, decrypted-plaintext) frames, derived from a capture.
 FRAMES = [
-    ("read_dev_info", "a724982db699778c0088ebef03f5c3e90ac290a0",
+    ("read_dev_info", "3f8d668e1b247f7ee232aabdba5b8bc9b57cd833",
      "0201000000000000000000000000000000000000"),
-    ("dev_info_resp", "f4874e347205e34460950c3f58feb4ed6182bc65",
-     "0101000300000101010100000eef2a00000000bd"),
-    ("read_light_state", "d71e8840684e2ed5bee04aba640173909e69eaa6",
+    ("dev_info_resp", "5ad4a8cb1fca3e25815eb7f5d14acf66faab3167",
+     "01010003000001010101000087d61200000000bd"),
+    ("read_light_state", "867c9e0fb17509d71c03c976e45c5ca09664727c",
      "022c010000000000000000000000000000000008"),
-    ("turn_on", "38e718c96a917d32cca444bab54d0a39d0757653",
+    ("turn_on", "f12a998bd69c964b6cadd6ce37d0fe8d9e0e8804",
      "03f501010000000000000000000000000000000d"),
-    ("set_colour_3", "7c7b61360763ebba4553f17735871159b43a2499",
+    ("set_colour_3", "849b86eee3958751cdf4f0f6776ff5233436520c",
      "03f5010500030000000000000000000000000012"),
-    ("turn_off", "4f0c9292defb72d120470b798c9e337975f80b49",
+    ("turn_off", "15c97ba95c26760d3d73886d906296cfabdec64c",
      "03f5010300000000000000000000000000000014"),
 ]
 
@@ -70,7 +74,7 @@ def test_dev_info_contains_serial():
     pt = decrypt_characteristic(bytes.fromhex(FRAMES[1][1]), SESSION)
     _op, _cmd, payload, _cnt = parse_frame(pt)
     serial = int.from_bytes(payload[9:13], "little")
-    assert serial == 2813710
+    assert serial == 1234567
 
 
 def test_build_frame_turn_on():

@@ -31,11 +31,12 @@ LOCAL_NAME = "HLITE2"
 
 # --- Advertisement manufacturer-data layout --------------------------------
 # Byte layout verified from live captures (company id 0x0447 already stripped
-# by HA), both steady-state and mid-power-cycle:
+# by HA), both steady-state and mid-power-cycle (serial and access code
+# below are dummy values):
 #   offset: 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22
-#   steady: 03 00 00 01 00 00 0e ef 2a 00 01 01 01 00 01 00 3c 00 00 00 00 00 00
-#   paired: 03 00 00 01 00 00 0e ef 2a 00 01 01 01 00 01 00 00 54 54 38 34 00 00
-#                           |serial 2813710|  |---always 01 01 01 00---|  |"TT84"|
+#   steady: 03 00 00 01 00 00 87 d6 12 00 01 01 01 00 01 00 3c 00 00 00 00 00 00
+#   paired: 03 00 00 01 00 00 87 d6 12 00 01 01 01 00 01 00 00 58 59 33 34 00 00
+#                           |serial 1234567|  |---always 01 01 01 00---|  |"XY34"|
 # Bytes 10-13 are a FIXED field (always 01 01 01 00) that earlier work wrongly
 # labelled the access code; byte 16 is a jittering counter. The real 4-byte
 # printable-ASCII access code is at offset 17, present only in the pairing
